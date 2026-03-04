@@ -1,12 +1,17 @@
 const API_BASE = '/api'
 
-export function getCsrfToken(): string | null {
-  const match = document.cookie.match(/csrf_token=([^;]+)/)
-  return match ? match[1] : null
+const ORG_STORAGE_KEY = 'summa_active_org_id'
+
+export function setActiveOrgId(orgId: number) {
+  localStorage.setItem(ORG_STORAGE_KEY, String(orgId))
+}
+
+export function getActiveOrgId(): number | null {
+  const stored = localStorage.getItem(ORG_STORAGE_KEY)
+  return stored ? Number(stored) : null
 }
 
 function buildHeaders(
-  method: string,
   contentType?: string
 ): HeadersInit {
   const headers: Record<string, string> = {}
@@ -15,11 +20,9 @@ function buildHeaders(
     headers['Content-Type'] = contentType
   }
 
-  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase())) {
-    const csrfToken = getCsrfToken()
-    if (csrfToken) {
-      headers['X-CSRF-Token'] = csrfToken
-    }
+  const orgId = getActiveOrgId()
+  if (orgId) {
+    headers['X-Organization-Id'] = String(orgId)
   }
 
   return headers
@@ -35,12 +38,11 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { method = 'GET', body, contentType = 'application/json' } = options
 
-  const headers = buildHeaders(method, body ? contentType : undefined)
+  const headers = buildHeaders(body ? contentType : undefined)
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method,
     headers,
-    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined
   })
 
@@ -70,15 +72,14 @@ export async function apiFormDataRequest<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {}
 
-  const csrfToken = getCsrfToken()
-  if (csrfToken) {
-    headers['X-CSRF-Token'] = csrfToken
+  const orgId = getActiveOrgId()
+  if (orgId) {
+    headers['X-Organization-Id'] = String(orgId)
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method,
     headers,
-    credentials: 'include',
     body: formData
   })
 

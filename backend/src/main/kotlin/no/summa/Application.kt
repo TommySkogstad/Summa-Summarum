@@ -12,44 +12,24 @@ fun main() {
 }
 
 fun Application.module() {
-    val emailService = EmailService()
-
-    // Konfigurer e-post (SMTP)
-    val smtpHost = System.getenv("SMTP_HOST") ?: ""
-    val smtpPort = System.getenv("SMTP_PORT")?.toIntOrNull() ?: 25
-    val smtpUser = System.getenv("SMTP_USER") ?: ""
-    val smtpPassword = System.getenv("SMTP_PASSWORD") ?: ""
-    val smtpFrom = System.getenv("SMTP_FROM") ?: "noreply@summa.tommytv.no"
-    val appDomain = System.getenv("APP_DOMAIN") ?: "summa.tommytv.no"
-    val smtpAuthRequired = System.getenv("SMTP_AUTH_REQUIRED")?.toBoolean() ?: false
-    if (smtpHost.isNotBlank()) {
-        emailService.configure(
-            host = smtpHost,
-            port = smtpPort,
-            user = smtpUser,
-            password = smtpPassword,
-            from = smtpFrom,
-            domain = appDomain,
-            requireAuth = smtpAuthRequired
-        )
-    }
-
-    val authService = AuthService(emailService)
+    val documentParserService = DocumentParserService(System.getenv("ANTHROPIC_API_KEY"))
     val categoryService = CategoryService()
-    val transactionService = TransactionService()
+    val transactionService = TransactionService(documentParserService)
     val reportService = ReportService()
+    val organizationService = OrganizationService()
+    val exchangeRateService = ExchangeRateService()
 
     // Plugins
     configureSerialization()
     configureSecurity()
     configureDatabase()
-    configureAuth()
-    install(CsrfProtection)
     configureRouting(
-        authService = authService,
         categoryService = categoryService,
         transactionService = transactionService,
-        reportService = reportService
+        reportService = reportService,
+        organizationService = organizationService,
+        exchangeRateService = exchangeRateService,
+        documentParserService = documentParserService
     )
 
     log.info("Summa Summarum backend startet pa port 8083")

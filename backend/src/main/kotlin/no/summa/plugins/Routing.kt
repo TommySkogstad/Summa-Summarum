@@ -8,10 +8,12 @@ import no.summa.routes.*
 import no.summa.services.*
 
 fun Application.configureRouting(
-    authService: AuthService,
     categoryService: CategoryService,
     transactionService: TransactionService,
-    reportService: ReportService
+    reportService: ReportService,
+    organizationService: OrganizationService,
+    exchangeRateService: ExchangeRateService,
+    documentParserService: DocumentParserService? = null
 ) {
     install(CORS) {
         allowMethod(HttpMethod.Options)
@@ -20,8 +22,7 @@ fun Application.configureRouting(
         allowMethod(HttpMethod.Put)
         allowMethod(HttpMethod.Delete)
         allowHeader(HttpHeaders.ContentType)
-        allowHeader(HttpHeaders.Authorization)
-        allowHeader("X-CSRF-Token")
+        allowHeader("X-Organization-Id")
         allowCredentials = true
 
         val allowedOrigins = System.getenv("ALLOWED_ORIGINS")
@@ -37,10 +38,10 @@ fun Application.configureRouting(
     routing {
         healthRoutes()
         route("/api") {
-            authRoutes(authService)
             categoryRoutes(categoryService)
-            transactionRoutes(transactionService)
-            reportRoutes(reportService)
+            transactionRoutes(transactionService, documentParserService)
+            reportRoutes(reportService, exchangeRateService)
+            organizationRoutes(organizationService)
         }
     }
 }

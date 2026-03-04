@@ -2,7 +2,7 @@
 
 ## Prosjektoversikt
 
-**Summa Summarum** - Enkelt regnskapssystem for bedrift/forening.
+**Summa Summarum** - Enkelt regnskapssystem for bedrift/forening med multi-tenancy (flere organisasjoner).
 
 ## Teknologier
 
@@ -40,47 +40,68 @@ summa-summarum/
     database/  Tables.kt, Seed.kt
     models/    DTOs.kt
     plugins/   Auth.kt, CSRF.kt, Database.kt, Routing.kt, Security.kt, Serialization.kt
-    routes/    AuthRoutes.kt, HealthRoutes.kt, CategoryRoutes.kt, TransactionRoutes.kt, ReportRoutes.kt
-    services/  AuthService.kt, EmailService.kt, CategoryService.kt, TransactionService.kt, ReportService.kt, RateLimiter.kt
+    routes/    AuthRoutes.kt, HealthRoutes.kt, CategoryRoutes.kt, TransactionRoutes.kt, ReportRoutes.kt, OrganizationRoutes.kt
+    services/  AuthService.kt, EmailService.kt, CategoryService.kt, TransactionService.kt, ReportService.kt, OrganizationService.kt, DocumentParserService.kt, ExchangeRateService.kt, RateLimiter.kt
     utils/     TimeUtils.kt, Validators.kt
   frontend/src/
     App.tsx, main.tsx, index.css
-    api/       apiClient.ts, auth.ts, categories.ts, transactions.ts, reports.ts
+    api/       apiClient.ts, auth.ts, categories.ts, transactions.ts, reports.ts, organizations.ts
     context/   AuthContext.tsx
     components/ ProtectedRoute.tsx, Layout.tsx, Sidebar.tsx
-    pages/     Login.tsx, Dashboard.tsx, Transactions.tsx, TransactionForm.tsx, Categories.tsx, Reports.tsx
+    pages/     Login.tsx, Dashboard.tsx, Transactions.tsx, TransactionForm.tsx, Categories.tsx, Reports.tsx, Organizations.tsx, OrgMembers.tsx
     lib/       queryClient.ts, formatters.ts
 ```
 
-## Database (6 tabeller)
+## Database (10 tabeller)
 
 | Tabell | Formål |
 |--------|--------|
-| Users | Brukere med OTP-felt (kun ADMIN-rolle) |
-| Categories | Kontoplan (code, name, type=INNTEKT/UTGIFT, active, isDefault) |
-| Transactions | Transaksjoner (date, type, amount, description, categoryId) |
+| Users | Brukere med OTP-felt (roller: ADMIN, SUPERADMIN) |
+| Organizations | Organisasjoner (name, orgNumber, mvaRegistered, createdBy, active) |
+| UserOrganizations | Kobling bruker-organisasjon (userId, organizationId) |
+| Categories | Delt kontoplan (code, name, type=INNTEKT/UTGIFT, active, isDefault) |
+| Transactions | Transaksjoner (date, type, amount, currency, vatRate, vatAmount, exchangeRate, amountNok, description, categoryId, organizationId) |
 | Attachments | Bilagsvedlegg (transactionId, filename, originalName, mimeType) |
+| ParsedDocuments | AI-parset data fra bilag (attachmentId, totalAmount, vatAmount, vatRate, vendorName, vendorOrgNumber, paymentDueDate, paymentReference, status) |
+| ParsedLineItems | Linjeposter fra parset bilag (parsedDocumentId, description, amount, vatRate, vatAmount) |
 | AuditLogs | Sporingslogg |
 | EmailLog | E-postlogg |
 
+## Multi-tenancy
+
+- **Roller**: ADMIN (per org, full tilgang), SUPERADMIN (global, kan opprette orgs og se alt)
+- **Dataisolasjon**: Transaksjoner og rapporter er scoped til aktiv organisasjon via JWT-claim
+- **Delt kontoplan**: Kategorier er globale, kun redigerbare av SUPERADMIN
+- **Org-bytting**: POST `/api/auth/switch-org/{orgId}` re-utsteder JWT med ny orgId
+- **Medlemshåndtering**: SUPERADMIN eller org-oppretter kan legge til/fjerne medlemmer
+
 ## API-endepunkter
 
-| Metode | Endepunkt | Beskrivelse |
-|--------|-----------|-------------|
-| POST | `/api/auth/request-code` | Be om OTP-kode |
-| POST | `/api/auth/verify-code` | Verifiser OTP |
-| POST | `/api/auth/logout` | Logg ut |
-| GET | `/api/auth/me` | Hent innlogget bruker |
-| GET/POST | `/api/categories` | Liste/opprett kategorier |
-| PUT/DELETE | `/api/categories/{id}` | Oppdater/slett kategori |
-| GET/POST | `/api/transactions` | Liste/opprett transaksjoner |
-| GET/PUT/DELETE | `/api/transactions/{id}` | Hent/oppdater/slett transaksjon |
-| POST | `/api/transactions/{id}/attachments` | Last opp vedlegg |
-| GET/DELETE | `/api/transactions/{id}/attachments/{aid}` | Hent/slett vedlegg |
-| GET | `/api/reports/overview` | Dashboard-oversikt |
-| GET | `/api/reports/monthly?year=` | Månedsrapport |
-| GET | `/api/reports/categories?year=&month=` | Kategorirapport |
-| GET | `/api/reports/yearly` | Årsrapport |
+| Metode | Endepunkt | Tilgang |
+|--------|-----------|---------|
+| POST | `/api/auth/request-code` | Offentlig |
+| POST | `/api/auth/verify-code` | Offentlig |
+| POST | `/api/auth/logout` | Offentlig |
+| GET | `/api/auth/me` | Autentisert |
+| POST | `/api/auth/switch-org/{orgId}` | Autentisert medlem/superadmin |
+| GET/POST | `/api/categories` | GET: Admin+, POST: Superadmin |
+| PUT/DELETE | `/api/categories/{id}` | Superadmin |
+| GET/POST | `/api/transactions` | Org-medlem (scoped) |
+| GET/PUT/DELETE | `/api/transactions/{id}` | Org-medlem (scoped) |
+| POST | `/api/transactions/{id}/attachments` | Org-medlem (scoped) |
+| GET/DELETE | `/api/transactions/{id}/attachments/{aid}` | Org-medlem (scoped) |
+| GET | `/api/reports/overview` | Org-medlem (scoped) |
+| GET | `/api/reports/monthly?year=` | Org-medlem (scoped) |
+| GET | `/api/reports/categories?year=&month=` | Org-medlem (scoped) |
+| GET | `/api/reports/yearly` | Org-medlem (scoped) |
+| GET | `/api/reports/mva?year=&month=` | Org-medlem (scoped) |
+| GET | `/api/exchange-rate?currency=&date=` | Org-medlem |
+| GET | `/api/organizations` | Autentisert |
+| POST | `/api/organizations` | Superadmin |
+| PUT | `/api/organizations/{id}` | Superadmin |
+| GET | `/api/organizations/{id}/members` | Superadmin / org-oppretter |
+| POST | `/api/organizations/{id}/members` | Superadmin / org-oppretter |
+| DELETE | `/api/organizations/{id}/members/{userId}` | Superadmin / org-oppretter |
 
 ## Konvensjoner
 

@@ -10,30 +10,31 @@ data class ErrorResponse(val error: String)
 @Serializable
 data class MessageResponse(val message: String)
 
-// ===== Auth =====
+// ===== Organisasjoner =====
 
 @Serializable
-data class RequestCodeRequest(val email: String)
-
-@Serializable
-data class RequestCodeResponse(
-    val message: String,
-    val devOtp: String? = null,
-    val cooldownSeconds: Int? = null
+data class OrganizationDTO(
+    val id: Int,
+    val name: String,
+    val orgNumber: String? = null,
+    val mvaRegistered: Boolean = false,
+    val active: Boolean,
+    val createdAt: String
 )
 
 @Serializable
-data class VerifyCodeRequest(val email: String, val code: String)
-
-@Serializable
-data class VerifyCodeResponse(val success: Boolean, val role: String? = null)
-
-@Serializable
-data class CurrentUserResponse(
-    val id: Int,
-    val email: String,
+data class CreateOrganizationRequest(
     val name: String,
-    val role: String
+    val orgNumber: String? = null,
+    val mvaRegistered: Boolean = false
+)
+
+@Serializable
+data class UpdateOrganizationRequest(
+    val name: String? = null,
+    val orgNumber: String? = null,
+    val mvaRegistered: Boolean? = null,
+    val active: Boolean? = null
 )
 
 // ===== Kategorier =====
@@ -71,11 +72,16 @@ data class TransactionDTO(
     val date: String,
     val type: String,
     val amount: String,
+    val currency: String = "NOK",
+    val vatRate: String? = null,
+    val vatAmount: String? = null,
+    val exchangeRate: String? = null,
+    val amountNok: String? = null,
     val description: String,
+    val vendorName: String? = null,
     val categoryId: Int,
     val categoryCode: String? = null,
     val categoryName: String? = null,
-    val createdBy: Int? = null,
     val createdAt: String,
     val updatedAt: String,
     val attachments: List<AttachmentDTO> = emptyList()
@@ -86,7 +92,13 @@ data class CreateTransactionRequest(
     val date: String,
     val type: String,
     val amount: String,
+    val currency: String = "NOK",
+    val vatRate: String? = null,
+    val vatAmount: String? = null,
+    val exchangeRate: String? = null,
+    val amountNok: String? = null,
     val description: String,
+    val vendorName: String? = null,
     val categoryId: Int
 )
 
@@ -95,7 +107,13 @@ data class UpdateTransactionRequest(
     val date: String? = null,
     val type: String? = null,
     val amount: String? = null,
+    val currency: String? = null,
+    val vatRate: String? = null,
+    val vatAmount: String? = null,
+    val exchangeRate: String? = null,
+    val amountNok: String? = null,
     val description: String? = null,
+    val vendorName: String? = null,
     val categoryId: Int? = null
 )
 
@@ -116,7 +134,57 @@ data class AttachmentDTO(
     val filename: String,
     val originalName: String,
     val mimeType: String,
-    val createdAt: String
+    val createdAt: String,
+    val parsedDocument: ParsedDocumentDTO? = null
+)
+
+// ===== Parsed documents =====
+
+@Serializable
+data class ParsedLineItemDTO(
+    val description: String? = null,
+    val quantity: String? = null,
+    val unitPrice: String? = null,
+    val amount: String? = null,
+    val vatRate: String? = null,
+    val vatAmount: String? = null
+)
+
+@Serializable
+data class ParsedDocumentDTO(
+    val id: Int,
+    val totalAmount: String? = null,
+    val currency: String? = null,
+    val vatAmount: String? = null,
+    val vatRate: String? = null,
+    val invoiceDate: String? = null,
+    val paymentDueDate: String? = null,
+    val paymentReference: String? = null,
+    val vendorName: String? = null,
+    val vendorOrgNumber: String? = null,
+    val invoiceNumber: String? = null,
+    val confidence: String? = null,
+    val status: String,
+    val errorMessage: String? = null,
+    val lineItems: List<ParsedLineItemDTO> = emptyList()
+)
+
+@Serializable
+data class AttachmentWithTransactionDTO(
+    val id: Int,
+    val transactionId: Int,
+    val filename: String,
+    val originalName: String,
+    val mimeType: String,
+    val createdAt: String,
+    val transactionDate: String,
+    val transactionDescription: String
+)
+
+@Serializable
+data class AttachmentListResponse(
+    val attachments: List<AttachmentWithTransactionDTO>,
+    val total: Int
 )
 
 // ===== Rapporter =====
@@ -173,4 +241,27 @@ data class YearlyReportRow(
 @Serializable
 data class YearlyReportResponse(
     val years: List<YearlyReportRow>
+)
+
+// ===== MVA-rapport =====
+
+@Serializable
+data class MvaReportResponse(
+    val year: Int,
+    val month: Int? = null,
+    val utgaaendeMva: String,
+    val inngaaendeMva: String,
+    val mvaGrunnlagUtgaaende: String,
+    val mvaGrunnlagInngaaende: String,
+    val nettoBetaling: String
+)
+
+// ===== Valutakurs =====
+
+@Serializable
+data class ExchangeRateResponse(
+    val base: String,
+    val target: String,
+    val rate: String,
+    val date: String
 )

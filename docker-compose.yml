@@ -29,6 +29,8 @@ services:
       SMTP_FROM: "noreply@summa.tommytv.no"
       APP_DOMAIN: "summa.tommytv.no"
       SMTP_AUTH_REQUIRED: "false"
+      SEED_TEST_DATA: "true"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     volumes:
       - summa_uploads:/app/uploads
     depends_on:

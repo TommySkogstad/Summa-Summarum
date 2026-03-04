@@ -6,7 +6,7 @@ export function Categories() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [formData, setFormData] = useState({ code: '', name: '', type: 'UTGIFT' })
+  const [formData, setFormData] = useState({ code: '', name: '', type: 'UTGIFT' as Category['type'] })
 
   const { data: categories, isLoading } = useQuery({
     queryKey: ['categories'],
@@ -39,7 +39,7 @@ export function Categories() {
   const resetForm = () => {
     setShowForm(false)
     setEditingId(null)
-    setFormData({ code: '', name: '', type: 'UTGIFT' })
+    setFormData({ code: '', name: '', type: 'UTGIFT' as Category['type'] })
   }
 
   const handleEdit = (cat: Category) => {
@@ -68,6 +68,30 @@ export function Categories() {
   const inntekter = categories?.filter(c => c.type === 'INNTEKT') || []
   const utgifter = categories?.filter(c => c.type === 'UTGIFT') || []
 
+  const renderCategoryRow = (cat: Category) => (
+    <div key={cat.id} className={`flex items-center justify-between p-4 ${!cat.active ? 'opacity-50' : ''}`}>
+      <div>
+        <span className="font-mono text-sm text-gray-500 mr-3">{cat.code}</span>
+        <span className="font-medium">{cat.name}</span>
+        {cat.isDefault && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Standard</span>}
+        {!cat.active && <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">Deaktivert</span>}
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => handleToggleActive(cat)} className="text-sm text-gray-500 hover:text-gray-700">
+          {cat.active ? 'Deaktiver' : 'Aktiver'}
+        </button>
+        <button onClick={() => handleEdit(cat)} className="text-sm text-summa-600 hover:text-summa-800">
+          Rediger
+        </button>
+        {!cat.isDefault && (
+          <button onClick={() => deleteMutation.mutate(cat.id)} className="text-sm text-red-600 hover:text-red-800">
+            Slett
+          </button>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -80,7 +104,6 @@ export function Categories() {
         </button>
       </div>
 
-      {/* Skjema */}
       {showForm && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">{editingId ? 'Rediger kategori' : 'Ny kategori'}</h2>
@@ -112,7 +135,7 @@ export function Categories() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
               <select
                 value={formData.type}
-                onChange={e => setFormData(prev => ({ ...prev, type: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, type: e.target.value as Category['type'] }))}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-summa-500 focus:border-transparent"
               >
                 <option value="INNTEKT">Inntekt</option>
@@ -143,67 +166,21 @@ export function Categories() {
         </div>
       )}
 
-      {/* Inntekter */}
       <div className="bg-white rounded-lg shadow mb-6">
         <div className="p-4 border-b bg-green-50">
           <h2 className="text-lg font-semibold text-green-800">Inntekter</h2>
         </div>
         <div className="divide-y">
-          {inntekter.map(cat => (
-            <div key={cat.id} className={`flex items-center justify-between p-4 ${!cat.active ? 'opacity-50' : ''}`}>
-              <div>
-                <span className="font-mono text-sm text-gray-500 mr-3">{cat.code}</span>
-                <span className="font-medium">{cat.name}</span>
-                {cat.isDefault && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Standard</span>}
-                {!cat.active && <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">Deaktivert</span>}
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => handleToggleActive(cat)} className="text-sm text-gray-500 hover:text-gray-700">
-                  {cat.active ? 'Deaktiver' : 'Aktiver'}
-                </button>
-                <button onClick={() => handleEdit(cat)} className="text-sm text-summa-600 hover:text-summa-800">
-                  Rediger
-                </button>
-                {!cat.isDefault && (
-                  <button onClick={() => deleteMutation.mutate(cat.id)} className="text-sm text-red-600 hover:text-red-800">
-                    Slett
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+          {inntekter.map(renderCategoryRow)}
         </div>
       </div>
 
-      {/* Utgifter */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b bg-red-50">
           <h2 className="text-lg font-semibold text-red-800">Utgifter</h2>
         </div>
         <div className="divide-y">
-          {utgifter.map(cat => (
-            <div key={cat.id} className={`flex items-center justify-between p-4 ${!cat.active ? 'opacity-50' : ''}`}>
-              <div>
-                <span className="font-mono text-sm text-gray-500 mr-3">{cat.code}</span>
-                <span className="font-medium">{cat.name}</span>
-                {cat.isDefault && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Standard</span>}
-                {!cat.active && <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">Deaktivert</span>}
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => handleToggleActive(cat)} className="text-sm text-gray-500 hover:text-gray-700">
-                  {cat.active ? 'Deaktiver' : 'Aktiver'}
-                </button>
-                <button onClick={() => handleEdit(cat)} className="text-sm text-summa-600 hover:text-summa-800">
-                  Rediger
-                </button>
-                {!cat.isDefault && (
-                  <button onClick={() => deleteMutation.mutate(cat.id)} className="text-sm text-red-600 hover:text-red-800">
-                    Slett
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+          {utgifter.map(renderCategoryRow)}
         </div>
       </div>
     </div>

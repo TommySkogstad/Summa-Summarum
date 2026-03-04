@@ -4,6 +4,7 @@ import no.summa.database.*
 import no.summa.models.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.File
 import java.math.BigDecimal
@@ -11,7 +12,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-class TransactionService {
+class TransactionService(private val documentParserService: DocumentParserService? = null) {
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
     private val uploadDir = File("/app/uploads/attachments")
 
@@ -20,6 +21,7 @@ class TransactionService {
     }
 
     fun getAll(
+        organizationId: Int,
         page: Int = 1,
         pageSize: Int = 20,
         type: String? = null,
@@ -30,6 +32,7 @@ class TransactionService {
     ): TransactionListResponse = transaction {
         var query = Transactions.innerJoin(Categories)
             .selectAll()
+            .andWhere { Transactions.organizationId eq organizationId }
 
         type?.let { t ->
             val transType = TransactionType.valueOf(t)
@@ -81,10 +84,10 @@ class TransactionService {
         )
     }
 
-    fun getById(id: Int): TransactionDTO? = transaction {
+    fun getById(id: Int, organizationId: Int): TransactionDTO? = transaction {
         val row = Transactions.innerJoin(Categories)
             .selectAll()
-            .where { Transactions.id eq id }
+            .where { (Transactions.id eq id) and (Transactions.organizationId eq organizationId) }
             .singleOrNull() ?: return@transaction null
 
         val attachments = Attachments.selectAll()
@@ -94,7 +97,7 @@ class TransactionService {
         toDTO(row, attachments)
     }
 
-    fun create(request: CreateTransactionRequest, userId: Int?): TransactionDTO = transaction {
+    fun create(request: CreateTransactionRequest, organizationId: Int): TransactionDTO = transaction {
         val type = TransactionType.valueOf(request.type)
         val amount = BigDecimal(request.amount)
         val date = LocalDateTime.parse(request.date + "T00:00:00")
@@ -103,39 +106,50 @@ class TransactionService {
             it[Transactions.date] = date
             it[Transactions.type] = type
             it[Transactions.amount] = amount
+            it[currency] = request.currency
+            it[vatRate] = request.vatRate?.let { v -> BigDecimal(v) }
+            it[vatAmount] = request.vatAmount?.let { v -> BigDecimal(v) }
+            it[exchangeRate] = request.exchangeRate?.let { v -> BigDecimal(v) }
+            it[amountNok] = request.amountNok?.let { v -> BigDecimal(v) }
             it[description] = request.description
+            it[vendorName] = request.vendorName
             it[categoryId] = request.categoryId
-            it[createdBy] = userId
+            it[Transactions.organizationId] = organizationId
             it[createdAt] = TimeUtils.nowOslo()
             it[updatedAt] = TimeUtils.nowOslo()
         }.value
 
-        getById(id)!!
+        getById(id, organizationId)!!
     }
 
-    fun update(id: Int, request: UpdateTransactionRequest): TransactionDTO? = transaction {
-        val existing = Transactions.selectAll()
-            .where { Transactions.id eq id }
+    fun update(id: Int, request: UpdateTransactionRequest, organizationId: Int): TransactionDTO? = transaction {
+        Transactions.selectAll()
+            .where { (Transactions.id eq id) and (Transactions.organizationId eq organizationId) }
             .singleOrNull() ?: return@transaction null
 
-        Transactions.update({ Transactions.id eq id }) {
+        Transactions.update({ (Transactions.id eq id) and (Transactions.organizationId eq organizationId) }) {
             request.date?.let { d -> it[date] = LocalDateTime.parse(d + "T00:00:00") }
             request.type?.let { t -> it[type] = TransactionType.valueOf(t) }
             request.amount?.let { a -> it[amount] = BigDecimal(a) }
+            request.currency?.let { c -> it[currency] = c }
+            request.vatRate?.let { v -> it[vatRate] = BigDecimal(v) }
+            request.vatAmount?.let { v -> it[vatAmount] = BigDecimal(v) }
+            request.exchangeRate?.let { v -> it[exchangeRate] = BigDecimal(v) }
+            request.amountNok?.let { v -> it[amountNok] = BigDecimal(v) }
             request.description?.let { d -> it[description] = d }
+            request.vendorName?.let { v -> it[vendorName] = v }
             request.categoryId?.let { c -> it[categoryId] = c }
             it[updatedAt] = TimeUtils.nowOslo()
         }
 
-        getById(id)
+        getById(id, organizationId)
     }
 
-    fun delete(id: Int): Boolean = transaction {
-        val existing = Transactions.selectAll()
-            .where { Transactions.id eq id }
+    fun delete(id: Int, organizationId: Int): Boolean = transaction {
+        Transactions.selectAll()
+            .where { (Transactions.id eq id) and (Transactions.organizationId eq organizationId) }
             .singleOrNull() ?: return@transaction false
 
-        // Slett vedlegg
         val attachments = Attachments.selectAll()
             .where { Attachments.transactionId eq id }
             .toList()
@@ -145,20 +159,32 @@ class TransactionService {
             file.delete()
         }
 
+        // Slett parsed documents og line items for vedlegg
+        val attachmentIds = attachments.map { it[Attachments.id].value }
+        if (attachmentIds.isNotEmpty()) {
+            val parsedDocIds = ParsedDocuments.selectAll()
+                .where { ParsedDocuments.attachmentId inList attachmentIds }
+                .map { it[ParsedDocuments.id].value }
+            if (parsedDocIds.isNotEmpty()) {
+                ParsedLineItems.deleteWhere { ParsedLineItems.parsedDocumentId inList parsedDocIds }
+            }
+            ParsedDocuments.deleteWhere { ParsedDocuments.attachmentId inList attachmentIds }
+        }
+
         Attachments.deleteWhere { Attachments.transactionId eq id }
-        Transactions.deleteWhere { Transactions.id eq id }
+        Transactions.deleteWhere { (Transactions.id eq id) and (Transactions.organizationId eq organizationId) }
         true
     }
 
     fun addAttachment(
         transactionId: Int,
+        organizationId: Int,
         originalName: String,
         mimeType: String,
         fileBytes: ByteArray
     ): AttachmentDTO? = transaction {
-        // Sjekk at transaksjonen finnes
         Transactions.selectAll()
-            .where { Transactions.id eq transactionId }
+            .where { (Transactions.id eq transactionId) and (Transactions.organizationId eq organizationId) }
             .singleOrNull() ?: return@transaction null
 
         val extension = originalName.substringAfterLast('.', "bin")
@@ -174,15 +200,30 @@ class TransactionService {
             it[createdAt] = TimeUtils.nowOslo()
         }.value
 
+        // Parse dokument med Claude Vision hvis tilgjengelig
+        if (documentParserService != null && documentParserService.isEnabled && documentParserService.canParse(mimeType)) {
+            try {
+                documentParserService.parseAndStore(id, fileBytes, mimeType)
+            } catch (e: Exception) {
+                // Parsing-feil skal aldri blokkere opplasting
+                org.slf4j.LoggerFactory.getLogger(javaClass).warn("Dokumentparsing feilet for vedlegg $id: ${e.message}")
+            }
+        }
+
         Attachments.selectAll()
             .where { Attachments.id eq id }
             .singleOrNull()
             ?.let { toAttachmentDTO(it) }
     }
 
-    fun getAttachment(attachmentId: Int): Pair<AttachmentDTO, File>? = transaction {
+    fun getAttachment(attachmentId: Int, organizationId: Int): Pair<AttachmentDTO, File>? = transaction {
         val row = Attachments.selectAll()
             .where { Attachments.id eq attachmentId }
+            .singleOrNull() ?: return@transaction null
+
+        val txId = row[Attachments.transactionId].value
+        Transactions.selectAll()
+            .where { (Transactions.id eq txId) and (Transactions.organizationId eq organizationId) }
             .singleOrNull() ?: return@transaction null
 
         val dto = toAttachmentDTO(row)
@@ -192,17 +233,54 @@ class TransactionService {
         Pair(dto, file)
     }
 
-    fun deleteAttachment(attachmentId: Int): Boolean = transaction {
+    fun deleteAttachment(attachmentId: Int, organizationId: Int): Boolean = transaction {
         val row = Attachments.selectAll()
             .where { Attachments.id eq attachmentId }
+            .singleOrNull() ?: return@transaction false
+
+        val txId = row[Attachments.transactionId].value
+        Transactions.selectAll()
+            .where { (Transactions.id eq txId) and (Transactions.organizationId eq organizationId) }
             .singleOrNull() ?: return@transaction false
 
         val filename = row[Attachments.filename]
         val file = File(uploadDir, filename)
         file.delete()
 
+        // Slett parsed document og line items
+        val parsedDoc = ParsedDocuments.selectAll()
+            .where { ParsedDocuments.attachmentId eq attachmentId }
+            .singleOrNull()
+        if (parsedDoc != null) {
+            val parsedDocId = parsedDoc[ParsedDocuments.id].value
+            ParsedLineItems.deleteWhere { ParsedLineItems.parsedDocumentId eq parsedDocId }
+            ParsedDocuments.deleteWhere { ParsedDocuments.id eq parsedDocId }
+        }
+
         Attachments.deleteWhere { Attachments.id eq attachmentId }
         true
+    }
+
+    fun getAllAttachments(organizationId: Int): AttachmentListResponse = transaction {
+        val rows = Attachments
+            .innerJoin(Transactions)
+            .selectAll()
+            .where { Transactions.organizationId eq organizationId }
+            .orderBy(Attachments.createdAt, SortOrder.DESC)
+            .map { row ->
+                AttachmentWithTransactionDTO(
+                    id = row[Attachments.id].value,
+                    transactionId = row[Attachments.transactionId].value,
+                    filename = row[Attachments.filename],
+                    originalName = row[Attachments.originalName],
+                    mimeType = row[Attachments.mimeType],
+                    createdAt = row[Attachments.createdAt].format(dateFormatter),
+                    transactionDate = row[Transactions.date].format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    transactionDescription = row[Transactions.description]
+                )
+            }
+
+        AttachmentListResponse(attachments = rows, total = rows.size)
     }
 
     private fun toDTO(row: ResultRow, attachments: List<AttachmentDTO> = emptyList()): TransactionDTO {
@@ -211,11 +289,16 @@ class TransactionService {
             date = row[Transactions.date].format(DateTimeFormatter.ISO_LOCAL_DATE),
             type = row[Transactions.type].name,
             amount = row[Transactions.amount].toPlainString(),
+            currency = row[Transactions.currency],
+            vatRate = row[Transactions.vatRate]?.toPlainString(),
+            vatAmount = row[Transactions.vatAmount]?.toPlainString(),
+            exchangeRate = row[Transactions.exchangeRate]?.toPlainString(),
+            amountNok = row[Transactions.amountNok]?.toPlainString(),
             description = row[Transactions.description],
+            vendorName = row[Transactions.vendorName],
             categoryId = row[Transactions.categoryId].value,
             categoryCode = row[Categories.code],
             categoryName = row[Categories.name],
-            createdBy = row[Transactions.createdBy]?.value,
             createdAt = row[Transactions.createdAt].format(dateFormatter),
             updatedAt = row[Transactions.updatedAt].format(dateFormatter),
             attachments = attachments
@@ -223,13 +306,17 @@ class TransactionService {
     }
 
     private fun toAttachmentDTO(row: ResultRow): AttachmentDTO {
+        val attachmentId = row[Attachments.id].value
+        val parsedDoc = documentParserService?.getParsedDocument(attachmentId)
+
         return AttachmentDTO(
-            id = row[Attachments.id].value,
+            id = attachmentId,
             transactionId = row[Attachments.transactionId].value,
             filename = row[Attachments.filename],
             originalName = row[Attachments.originalName],
             mimeType = row[Attachments.mimeType],
-            createdAt = row[Attachments.createdAt].format(dateFormatter)
+            createdAt = row[Attachments.createdAt].format(dateFormatter),
+            parsedDocument = parsedDoc
         )
     }
 }

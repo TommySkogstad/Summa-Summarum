@@ -1,62 +1,64 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { getCurrentUser, logout as apiLogout } from '../api/auth'
+import { getOrganizations, Organization } from '../api/organizations'
 import { queryClient } from '../lib/queryClient'
+import { setActiveOrgId, getActiveOrgId } from '../api/apiClient'
 
-interface User {
-  id: number
-  email: string
-  name: string
-  role: 'ADMIN'
-}
-
-interface AuthContextType {
-  user: User | null
+interface OrgContextType {
+  organizations: Organization[]
+  activeOrg: Organization | null
   loading: boolean
-  login: (user: User) => void
-  logout: () => Promise<void>
-  refreshUser: () => Promise<void>
+  switchOrganization: (orgId: number) => void
+  refreshOrganizations: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const OrgContext = createContext<OrgContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [activeOrgId, setActiveOrgIdState] = useState<number | null>(getActiveOrgId())
   const [loading, setLoading] = useState(true)
 
-  const refreshUser = async () => {
+  const refreshOrganizations = async () => {
     try {
-      const currentUser = await getCurrentUser()
-      setUser(currentUser)
+      const orgs = await getOrganizations()
+      setOrganizations(orgs)
+
+      // Velg forste org hvis ingen er valgt, eller valgt org ikke finnes lenger
+      if (orgs.length > 0) {
+        const currentId = getActiveOrgId()
+        if (!currentId || !orgs.find(o => o.id === currentId)) {
+          setActiveOrgId(orgs[0].id)
+          setActiveOrgIdState(orgs[0].id)
+        }
+      }
     } catch {
-      setUser(null)
+      // Ignore - kanskje backend ikke er klart enna
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    refreshUser()
+    refreshOrganizations()
   }, [])
 
-  const login = (userData: User) => {
-    setUser(userData)
+  const switchOrganization = (orgId: number) => {
+    setActiveOrgId(orgId)
+    setActiveOrgIdState(orgId)
+    queryClient.clear()
   }
 
-  const logout = async () => {
-    await apiLogout()
-    queryClient.clear()
-    setUser(null)
-  }
+  const activeOrg = organizations.find(o => o.id === activeOrgId) ?? null
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <OrgContext.Provider value={{ organizations, activeOrg, loading, switchOrganization, refreshOrganizations }}>
       {children}
-    </AuthContext.Provider>
+    </OrgContext.Provider>
   )
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
+  const context = useContext(OrgContext)
   if (context === undefined) {
     throw new Error('useAuth must be used within AuthProvider')
   }

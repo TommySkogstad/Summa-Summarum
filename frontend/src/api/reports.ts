@@ -48,6 +48,16 @@ export interface YearlyReportResponse {
   years: YearlyReportRow[]
 }
 
+export interface MvaReportResponse {
+  year: number
+  month?: number
+  utgaaendeMva: string
+  inngaaendeMva: string
+  mvaGrunnlagUtgaaende: string
+  mvaGrunnlagInngaaende: string
+  nettoBetaling: string
+}
+
 export async function getOverview(): Promise<OverviewResponse> {
   return apiRequest<OverviewResponse>('/reports/overview')
 }
@@ -63,4 +73,9 @@ export async function getCategoryReport(year: number, month?: number): Promise<C
 
 export async function getYearlyReport(): Promise<YearlyReportResponse> {
   return apiRequest<YearlyReportResponse>('/reports/yearly')
+}
+
+export async function getMvaReport(year: number, month?: number): Promise<MvaReportResponse> {
+  const params = `year=${year}${month ? `&month=${month}` : ''}`
+  return apiRequest<MvaReportResponse>(`/reports/mva?${params}`)
 }

@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getMonthlyReport, getCategoryReport, getYearlyReport } from '../api/reports'
+import { getMonthlyReport, getCategoryReport, getYearlyReport, getMvaReport } from '../api/reports'
 import { formatCurrency } from '../lib/formatters'
+import { useAuth } from '../context/AuthContext'
 
-type Tab = 'monthly' | 'categories' | 'yearly'
+type Tab = 'monthly' | 'categories' | 'yearly' | 'mva'
 
 export function Reports() {
   const currentYear = new Date().getFullYear()
   const [tab, setTab] = useState<Tab>('monthly')
   const [year, setYear] = useState(currentYear)
   const [month, setMonth] = useState<number | undefined>(undefined)
+  const { activeOrg } = useAuth()
+
+  const isMvaRegistered = activeOrg?.mvaRegistered ?? false
 
   const { data: monthlyData, isLoading: monthlyLoading } = useQuery({
     queryKey: ['monthly-report', year],
@@ -29,10 +33,17 @@ export function Reports() {
     enabled: tab === 'yearly',
   })
 
-  const tabs: { id: Tab; label: string }[] = [
+  const { data: mvaData, isLoading: mvaLoading } = useQuery({
+    queryKey: ['mva-report', year, month],
+    queryFn: () => getMvaReport(year, month),
+    enabled: tab === 'mva' && isMvaRegistered,
+  })
+
+  const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
     { id: 'monthly', label: 'Per maned' },
     { id: 'categories', label: 'Per kategori' },
     { id: 'yearly', label: 'Per ar' },
+    { id: 'mva', label: 'MVA', hidden: !isMvaRegistered },
   ]
 
   return (
@@ -41,7 +52,7 @@ export function Reports() {
 
       {/* Faner */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
-        {tabs.map(t => (
+        {tabs.filter(t => !t.hidden).map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -57,7 +68,7 @@ export function Reports() {
       </div>
 
       {/* År-velger */}
-      {(tab === 'monthly' || tab === 'categories') && (
+      {(tab === 'monthly' || tab === 'categories' || tab === 'mva') && (
         <div className="flex gap-4 items-center mb-6">
           <label className="text-sm font-medium text-gray-700">Ar:</label>
           <select
@@ -69,7 +80,7 @@ export function Reports() {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
-          {tab === 'categories' && (
+          {(tab === 'categories' || tab === 'mva') && (
             <>
               <label className="text-sm font-medium text-gray-700 ml-4">Maned:</label>
               <select
@@ -216,6 +227,60 @@ export function Reports() {
                 })}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+
+      {/* MVA-rapport */}
+      {tab === 'mva' && isMvaRegistered && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          {mvaLoading ? (
+            <div className="p-6 text-gray-500 text-center">Laster MVA-rapport...</div>
+          ) : mvaData ? (
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-green-800 mb-2">Utgaende MVA (salg)</h3>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-green-700">Grunnlag:</span>
+                      <span className="font-semibold text-green-800">{formatCurrency(mvaData.mvaGrunnlagUtgaaende)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-green-700">MVA:</span>
+                      <span className="font-semibold text-green-800">{formatCurrency(mvaData.utgaaendeMva)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-red-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-red-800 mb-2">Inngaende MVA (kjop)</h3>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-red-700">Grunnlag:</span>
+                      <span className="font-semibold text-red-800">{formatCurrency(mvaData.mvaGrunnlagInngaaende)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-red-700">MVA:</span>
+                      <span className="font-semibold text-red-800">{formatCurrency(mvaData.inngaaendeMva)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-lg p-4 ${parseFloat(mvaData.nettoBetaling) >= 0 ? 'bg-amber-50' : 'bg-blue-50'}`}>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-gray-800">
+                    {parseFloat(mvaData.nettoBetaling) >= 0 ? 'Skyldig MVA (a betale)' : 'MVA til gode'}
+                  </span>
+                  <span className={`text-xl font-bold ${parseFloat(mvaData.nettoBetaling) >= 0 ? 'text-amber-700' : 'text-blue-700'}`}>
+                    {formatCurrency(Math.abs(parseFloat(mvaData.nettoBetaling)))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 text-gray-500 text-center">Ingen MVA-data tilgjengelig</div>
           )}
         </div>
       )}

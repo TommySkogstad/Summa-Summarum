@@ -4,12 +4,13 @@ import { queryClient } from './lib/queryClient'
 import { AuthProvider } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
-import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { TransactionForm } from './pages/TransactionForm'
 import { Categories } from './pages/Categories'
 import { Reports } from './pages/Reports'
+import { Organizations } from './pages/Organizations'
+import { Attachments } from './pages/Attachments'
 
 function App() {
   return (
@@ -17,8 +18,6 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/logg-inn" element={<Login />} />
-
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout><Dashboard /></Layout>
@@ -52,6 +51,18 @@ function App() {
             <Route path="/rapporter" element={
               <ProtectedRoute>
                 <Layout><Reports /></Layout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/bilag" element={
+              <ProtectedRoute>
+                <Layout><Attachments /></Layout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/organisasjoner" element={
+              <ProtectedRoute>
+                <Layout><Organizations /></Layout>
               </ProtectedRoute>
             } />
 

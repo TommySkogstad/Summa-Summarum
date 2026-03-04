@@ -22,10 +22,7 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation")
     implementation("io.ktor:ktor-serialization-kotlinx-json")
     implementation("io.ktor:ktor-server-cors")
-    implementation("io.ktor:ktor-server-auth")
-    implementation("io.ktor:ktor-server-auth-jwt")
     implementation("io.ktor:ktor-server-status-pages")
-    implementation("io.ktor:ktor-server-double-receive")
 
     // Database
     implementation("org.jetbrains.exposed:exposed-core:0.57.0")
@@ -34,8 +31,8 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.4")
     implementation("com.zaxxer:HikariCP:6.2.1")
 
-    // E-post
-    implementation("com.sun.mail:jakarta.mail:2.0.2")
+    // Anthropic SDK (Claude Vision for document parsing)
+    implementation("com.anthropic:anthropic-java:2.15.0")
 
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.15")

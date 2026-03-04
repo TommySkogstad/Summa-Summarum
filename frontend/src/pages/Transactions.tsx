@@ -110,6 +110,9 @@ export function Transactions() {
                     <Link to={`/transaksjoner/${tx.id}`} className="text-summa-600 hover:text-summa-800 font-medium">
                       {tx.description}
                     </Link>
+                    {tx.vendorName && (
+                      <span className="ml-2 text-xs text-gray-500">{tx.vendorName}</span>
+                    )}
                     {tx.attachments.length > 0 && (
                       <span className="ml-2 text-xs text-gray-400">{tx.attachments.length} vedlegg</span>
                     )}
@@ -129,7 +132,7 @@ export function Transactions() {
                   <td className={`px-4 py-3 text-right font-medium ${
                     tx.type === 'INNTEKT' ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {tx.type === 'INNTEKT' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    {tx.type === 'INNTEKT' ? '+' : '-'}{formatCurrency(tx.amount)} {tx.currency && tx.currency !== 'NOK' ? tx.currency : ''}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link to={`/transaksjoner/${tx.id}`} className="text-sm text-summa-600 hover:text-summa-800 mr-3">

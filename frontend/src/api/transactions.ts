@@ -1,5 +1,32 @@
 import { apiRequest, apiFormDataRequest } from './apiClient'
 
+export interface ParsedLineItem {
+  description?: string
+  quantity?: string
+  unitPrice?: string
+  amount?: string
+  vatRate?: string
+  vatAmount?: string
+}
+
+export interface ParsedDocument {
+  id: number
+  totalAmount?: string
+  currency?: string
+  vatAmount?: string
+  vatRate?: string
+  invoiceDate?: string
+  paymentDueDate?: string
+  paymentReference?: string
+  vendorName?: string
+  vendorOrgNumber?: string
+  invoiceNumber?: string
+  confidence?: string
+  status: 'SUCCESS' | 'FAILED' | 'UNSUPPORTED'
+  errorMessage?: string
+  lineItems: ParsedLineItem[]
+}
+
 export interface Attachment {
   id: number
   transactionId: number
@@ -7,6 +34,7 @@ export interface Attachment {
   originalName: string
   mimeType: string
   createdAt: string
+  parsedDocument?: ParsedDocument
 }
 
 export interface Transaction {
@@ -14,7 +42,13 @@ export interface Transaction {
   date: string
   type: 'INNTEKT' | 'UTGIFT'
   amount: string
+  currency: string
+  vatRate?: string
+  vatAmount?: string
+  exchangeRate?: string
+  amountNok?: string
   description: string
+  vendorName?: string
   categoryId: number
   categoryCode?: string
   categoryName?: string
@@ -59,23 +93,11 @@ export async function getTransaction(id: number): Promise<Transaction> {
   return apiRequest<Transaction>(`/transactions/${id}`)
 }
 
-export async function createTransaction(data: {
-  date: string
-  type: string
-  amount: string
-  description: string
-  categoryId: number
-}): Promise<Transaction> {
+export async function createTransaction(data: Record<string, unknown>): Promise<Transaction> {
   return apiRequest<Transaction>('/transactions', { method: 'POST', body: data })
 }
 
-export async function updateTransaction(id: number, data: Partial<{
-  date: string
-  type: string
-  amount: string
-  description: string
-  categoryId: number
-}>): Promise<Transaction> {
+export async function updateTransaction(id: number, data: Record<string, unknown>): Promise<Transaction> {
   return apiRequest<Transaction>(`/transactions/${id}`, { method: 'PUT', body: data })
 }
 
@@ -91,4 +113,41 @@ export async function uploadAttachment(transactionId: number, file: File): Promi
 
 export async function deleteAttachment(transactionId: number, attachmentId: number): Promise<void> {
   return apiRequest(`/transactions/${transactionId}/attachments/${attachmentId}`, { method: 'DELETE' })
+}
+
+export interface AttachmentWithTransaction {
+  id: number
+  transactionId: number
+  filename: string
+  originalName: string
+  mimeType: string
+  createdAt: string
+  transactionDate: string
+  transactionDescription: string
+}
+
+export interface AttachmentListResponse {
+  attachments: AttachmentWithTransaction[]
+  total: number
+}
+
+export async function getAllAttachments(): Promise<AttachmentListResponse> {
+  return apiRequest<AttachmentListResponse>('/attachments')
+}
+
+export async function parseDocument(file: File): Promise<ParsedDocument> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiFormDataRequest<ParsedDocument>('/parse-document', formData)
+}
+
+export interface ExchangeRateResponse {
+  base: string
+  target: string
+  rate: string
+  date: string
+}
+
+export async function getExchangeRate(currency: string, date: string): Promise<ExchangeRateResponse> {
+  return apiRequest<ExchangeRateResponse>(`/exchange-rate?currency=${currency}&date=${date}`)
 }
