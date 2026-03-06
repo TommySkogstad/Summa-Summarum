@@ -1,5 +1,7 @@
-* text=auto eol=lf
-*.sh text eol=lf
-*.ps1 text eol=crlf
-*.bat text eol=crlf
-*.cmd text eol=crlf
+# Krypterte filer (git-crypt)
+.env filter=git-crypt diff=git-crypt
+.env.production filter=git-crypt diff=git-crypt
+secrets/** filter=git-crypt diff=git-crypt
+
+# IKKE krypter eksempelfiler
+.env.example !filter !diff
