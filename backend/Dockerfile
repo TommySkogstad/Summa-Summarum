@@ -18,8 +18,9 @@ RUN if [ -f /tmp/corporate-ca.pem ]; then \
     fi
 
 COPY build.gradle.kts settings.gradle.kts ./
-COPY src ./src
+RUN gradle dependencies --no-daemon
 
+COPY src ./src
 RUN gradle build -x test --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine

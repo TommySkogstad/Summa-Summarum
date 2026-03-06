@@ -6,18 +6,30 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.summa.models.*
+import no.summa.plugins.getUserId
 import no.summa.plugins.requireOrgId
+import no.summa.plugins.verifyCsrf
+import no.summa.services.AuditLogService
+import no.summa.services.AuthService
 import no.summa.services.DocumentParserService
 import no.summa.services.ParseResult
 import no.summa.services.TransactionService
+import no.summa.utils.Validators
 
-fun Route.transactionRoutes(transactionService: TransactionService, documentParserService: DocumentParserService?) {
+fun Route.transactionRoutes(
+    transactionService: TransactionService,
+    documentParserService: DocumentParserService?,
+    authService: AuthService,
+    auditLogService: AuditLogService
+) {
     get("/attachments") {
         val orgId = call.requireOrgId() ?: return@get
         call.respond(transactionService.getAllAttachments(orgId))
     }
 
     post("/parse-document") {
+        if (!call.verifyCsrf(authService)) return@post
+
         if (documentParserService == null || !documentParserService.isEnabled) {
             call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Dokumentparsing er ikke aktivert"))
             return@post
@@ -82,7 +94,7 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
             val orgId = call.requireOrgId() ?: return@get
 
             val page = call.parameters["page"]?.toIntOrNull() ?: 1
-            val pageSize = call.parameters["pageSize"]?.toIntOrNull() ?: 20
+            val pageSize = minOf(call.parameters["pageSize"]?.toIntOrNull() ?: 20, 100)
             val type = call.parameters["type"]
             val categoryId = call.parameters["categoryId"]?.toIntOrNull()
             val search = call.parameters["search"]
@@ -102,6 +114,7 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
         }
 
         post {
+            if (!call.verifyCsrf(authService)) return@post
             val orgId = call.requireOrgId() ?: return@post
             val request = call.receive<CreateTransactionRequest>()
 
@@ -110,8 +123,27 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
                 return@post
             }
 
+            if (!Validators.isValidAmount(request.amount)) {
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig beløp"))
+                return@post
+            }
+
+            val validTypes = listOf("INNTEKT", "UTGIFT")
+            if (request.type !in validTypes) {
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig transaksjonstype. Må være INNTEKT eller UTGIFT"))
+                return@post
+            }
+
             try {
                 val transaction = transactionService.create(request, orgId)
+                auditLogService.log(
+                    userId = call.getUserId(),
+                    action = "CREATE",
+                    entityType = "Transaction",
+                    entityId = transaction.id,
+                    details = "Opprettet transaksjon: ${transaction.description} (${transaction.amount} ${transaction.currency})",
+                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                )
                 call.respond(HttpStatusCode.Created, transaction)
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.BadRequest, ErrorResponse("Kunne ikke opprette transaksjon: ${e.message}"))
@@ -132,6 +164,7 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
         }
 
         put("/{id}") {
+            if (!call.verifyCsrf(authService)) return@put
             val orgId = call.requireOrgId() ?: return@put
             val id = call.parameters["id"]?.toIntOrNull()
                 ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig ID"))
@@ -140,6 +173,14 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
             val updated = transactionService.update(id, request, orgId)
 
             if (updated != null) {
+                auditLogService.log(
+                    userId = call.getUserId(),
+                    action = "UPDATE",
+                    entityType = "Transaction",
+                    entityId = id,
+                    details = "Oppdatert transaksjon: ${updated.description}",
+                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                )
                 call.respond(updated)
             } else {
                 call.respond(HttpStatusCode.NotFound, ErrorResponse("Transaksjon ikke funnet"))
@@ -147,11 +188,20 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
         }
 
         delete("/{id}") {
+            if (!call.verifyCsrf(authService)) return@delete
             val orgId = call.requireOrgId() ?: return@delete
             val id = call.parameters["id"]?.toIntOrNull()
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig ID"))
 
             if (transactionService.delete(id, orgId)) {
+                auditLogService.log(
+                    userId = call.getUserId(),
+                    action = "DELETE",
+                    entityType = "Transaction",
+                    entityId = id,
+                    details = "Slettet transaksjon",
+                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                )
                 call.respond(MessageResponse("Transaksjon slettet"))
             } else {
                 call.respond(HttpStatusCode.NotFound, ErrorResponse("Transaksjon ikke funnet"))
@@ -160,6 +210,7 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
 
         // Vedlegg
         post("/{id}/attachments") {
+            if (!call.verifyCsrf(authService)) return@post
             val orgId = call.requireOrgId() ?: return@post
             val transactionId = call.parameters["id"]?.toIntOrNull()
                 ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig transaksjons-ID"))
@@ -191,6 +242,14 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
             }
 
             if (attachment != null) {
+                auditLogService.log(
+                    userId = call.getUserId(),
+                    action = "CREATE",
+                    entityType = "Attachment",
+                    entityId = attachment!!.id,
+                    details = "Lastet opp vedlegg: ${attachment!!.originalName}",
+                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                )
                 call.respond(HttpStatusCode.Created, attachment!!)
             } else {
                 call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ingen fil mottatt eller transaksjon ikke funnet"))
@@ -218,11 +277,20 @@ fun Route.transactionRoutes(transactionService: TransactionService, documentPars
         }
 
         delete("/{id}/attachments/{aid}") {
+            if (!call.verifyCsrf(authService)) return@delete
             val orgId = call.requireOrgId() ?: return@delete
             val attachmentId = call.parameters["aid"]?.toIntOrNull()
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig vedleggs-ID"))
 
             if (transactionService.deleteAttachment(attachmentId, orgId)) {
+                auditLogService.log(
+                    userId = call.getUserId(),
+                    action = "DELETE",
+                    entityType = "Attachment",
+                    entityId = attachmentId,
+                    details = "Slettet vedlegg",
+                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                )
                 call.respond(MessageResponse("Vedlegg slettet"))
             } else {
                 call.respond(HttpStatusCode.NotFound, ErrorResponse("Vedlegg ikke funnet"))

@@ -1,18 +1,19 @@
 const API_BASE = '/api'
 
-const ORG_STORAGE_KEY = 'summa_active_org_id'
+let csrfToken = sessionStorage.getItem('csrf_token') || ''
 
-export function setActiveOrgId(orgId: number) {
-  localStorage.setItem(ORG_STORAGE_KEY, String(orgId))
-}
-
-export function getActiveOrgId(): number | null {
-  const stored = localStorage.getItem(ORG_STORAGE_KEY)
-  return stored ? Number(stored) : null
+export function setCsrfToken(token: string) {
+  csrfToken = token
+  if (token) {
+    sessionStorage.setItem('csrf_token', token)
+  } else {
+    sessionStorage.removeItem('csrf_token')
+  }
 }
 
 function buildHeaders(
-  contentType?: string
+  contentType?: string,
+  method?: string
 ): HeadersInit {
   const headers: Record<string, string> = {}
 
@@ -20,9 +21,9 @@ function buildHeaders(
     headers['Content-Type'] = contentType
   }
 
-  const orgId = getActiveOrgId()
-  if (orgId) {
-    headers['X-Organization-Id'] = String(orgId)
+  // Legg til CSRF-token på muterende operasjoner
+  if (method && method !== 'GET' && method !== 'HEAD' && csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken
   }
 
   return headers
@@ -38,13 +39,19 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { method = 'GET', body, contentType = 'application/json' } = options
 
-  const headers = buildHeaders(body ? contentType : undefined)
+  const headers = buildHeaders(body ? contentType : undefined, method)
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method,
     headers,
+    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined
   })
+
+  if (response.status === 401) {
+    window.location.href = '/login'
+    throw new Error('Ikke innlogget')
+  }
 
   if (!response.ok) {
     let errorMessage: string
@@ -72,16 +79,22 @@ export async function apiFormDataRequest<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {}
 
-  const orgId = getActiveOrgId()
-  if (orgId) {
-    headers['X-Organization-Id'] = String(orgId)
+  // CSRF-token på muterende operasjoner
+  if (method !== 'GET' && method !== 'HEAD' && csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method,
     headers,
+    credentials: 'include',
     body: formData
   })
+
+  if (response.status === 401) {
+    window.location.href = '/login'
+    throw new Error('Ikke innlogget')
+  }
 
   if (!response.ok) {
     let errorMessage: string

@@ -2,12 +2,16 @@ package no.summa.plugins
 
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.routing.*
 import no.summa.routes.*
 import no.summa.services.*
 
 fun Application.configureRouting(
+    authService: AuthService,
+    rateLimiter: RateLimiter,
+    auditLogService: AuditLogService,
     categoryService: CategoryService,
     transactionService: TransactionService,
     reportService: ReportService,
@@ -22,7 +26,7 @@ fun Application.configureRouting(
         allowMethod(HttpMethod.Put)
         allowMethod(HttpMethod.Delete)
         allowHeader(HttpHeaders.ContentType)
-        allowHeader("X-Organization-Id")
+        allowHeader("X-CSRF-Token")
         allowCredentials = true
 
         val allowedOrigins = System.getenv("ALLOWED_ORIGINS")
@@ -38,10 +42,16 @@ fun Application.configureRouting(
     routing {
         healthRoutes()
         route("/api") {
-            categoryRoutes(categoryService)
-            transactionRoutes(transactionService, documentParserService)
-            reportRoutes(reportService, exchangeRateService)
-            organizationRoutes(organizationService)
+            // Offentlige auth-endepunkter
+            authRoutes(authService, rateLimiter)
+
+            // Beskyttede endepunkter
+            authenticate("auth-jwt") {
+                categoryRoutes(categoryService, authService, auditLogService)
+                transactionRoutes(transactionService, documentParserService, authService, auditLogService)
+                reportRoutes(reportService, exchangeRateService)
+                organizationRoutes(organizationService, authService, auditLogService)
+            }
         }
     }
 }

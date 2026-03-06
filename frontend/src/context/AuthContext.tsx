@@ -1,66 +1,102 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { getOrganizations, Organization } from '../api/organizations'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { getMe, switchOrg, logout as apiLogout, type AuthUser } from '../api/auth'
 import { queryClient } from '../lib/queryClient'
-import { setActiveOrgId, getActiveOrgId } from '../api/apiClient'
+import { setCsrfToken } from '../api/apiClient'
 
-interface OrgContextType {
-  organizations: Organization[]
-  activeOrg: Organization | null
+interface AuthContextType {
+  user: AuthUser | null
+  organizations: AuthUser['organizations']
+  activeOrg: AuthUser['organizations'][0] | null
   loading: boolean
-  switchOrganization: (orgId: number) => void
+  authenticated: boolean
+  switchOrganization: (orgId: number) => Promise<void>
   refreshOrganizations: () => Promise<void>
+  onLogin: (csrfToken?: string) => void
+  logout: () => Promise<void>
 }
 
-const OrgContext = createContext<OrgContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [activeOrgId, setActiveOrgIdState] = useState<number | null>(getActiveOrgId())
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const refreshOrganizations = async () => {
+  const fetchUser = useCallback(async () => {
     try {
-      const orgs = await getOrganizations()
-      setOrganizations(orgs)
-
-      // Velg forste org hvis ingen er valgt, eller valgt org ikke finnes lenger
-      if (orgs.length > 0) {
-        const currentId = getActiveOrgId()
-        if (!currentId || !orgs.find(o => o.id === currentId)) {
-          setActiveOrgId(orgs[0].id)
-          setActiveOrgIdState(orgs[0].id)
-        }
+      const me = await getMe()
+      setUser(me)
+      if (me.csrfToken) {
+        setCsrfToken(me.csrfToken)
       }
     } catch {
-      // Ignore - kanskje backend ikke er klart enna
+      setUser(null)
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    refreshOrganizations()
   }, [])
 
-  const switchOrganization = (orgId: number) => {
-    setActiveOrgId(orgId)
-    setActiveOrgIdState(orgId)
-    queryClient.clear()
-  }
+  useEffect(() => {
+    fetchUser()
+  }, [fetchUser])
 
-  const activeOrg = organizations.find(o => o.id === activeOrgId) ?? null
+  const onLogin = useCallback((csrfToken?: string) => {
+    if (csrfToken) setCsrfToken(csrfToken)
+    fetchUser()
+  }, [fetchUser])
+
+  const switchOrganization = useCallback(async (orgId: number) => {
+    const token = getCsrfTokenFromStorage()
+    if (!token) return
+    try {
+      const result = await switchOrg(orgId, token)
+      if (result.csrfToken) setCsrfToken(result.csrfToken)
+      queryClient.clear()
+      await fetchUser()
+    } catch (err) {
+      console.error('Kunne ikke bytte organisasjon:', err)
+    }
+  }, [fetchUser])
+
+  const logout = useCallback(async () => {
+    await apiLogout()
+    setUser(null)
+    setCsrfToken('')
+    queryClient.clear()
+  }, [])
+
+  const refreshOrganizations = useCallback(async () => {
+    await fetchUser()
+  }, [fetchUser])
+
+  const organizations = user?.organizations ?? []
+  const activeOrg = organizations.find(o => o.id === user?.activeOrgId) ?? null
 
   return (
-    <OrgContext.Provider value={{ organizations, activeOrg, loading, switchOrganization, refreshOrganizations }}>
+    <AuthContext.Provider value={{
+      user,
+      organizations,
+      activeOrg,
+      loading,
+      authenticated: !!user,
+      switchOrganization,
+      refreshOrganizations,
+      onLogin,
+      logout,
+    }}>
       {children}
-    </OrgContext.Provider>
+    </AuthContext.Provider>
   )
 }
 
 export function useAuth() {
-  const context = useContext(OrgContext)
+  const context = useContext(AuthContext)
   if (context === undefined) {
     throw new Error('useAuth must be used within AuthProvider')
   }
   return context
+}
+
+// Intern hjelpefunksjon
+function getCsrfTokenFromStorage(): string | null {
+  return sessionStorage.getItem('csrf_token')
 }

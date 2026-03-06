@@ -41,7 +41,7 @@ summa-summarum/
     models/    DTOs.kt
     plugins/   Auth.kt, CSRF.kt, Database.kt, Routing.kt, Security.kt, Serialization.kt
     routes/    AuthRoutes.kt, HealthRoutes.kt, CategoryRoutes.kt, TransactionRoutes.kt, ReportRoutes.kt, OrganizationRoutes.kt
-    services/  AuthService.kt, EmailService.kt, CategoryService.kt, TransactionService.kt, ReportService.kt, OrganizationService.kt, DocumentParserService.kt, ExchangeRateService.kt, RateLimiter.kt
+    services/  AuthService.kt, EmailService.kt, CategoryService.kt, TransactionService.kt, ReportService.kt, OrganizationService.kt, DocumentParserService.kt, ExchangeRateService.kt, AuditLogService.kt, RateLimiter.kt
     utils/     TimeUtils.kt, Validators.kt
   frontend/src/
     App.tsx, main.tsx, index.css
@@ -50,6 +50,8 @@ summa-summarum/
     components/ ProtectedRoute.tsx, Layout.tsx, Sidebar.tsx
     pages/     Login.tsx, Dashboard.tsx, Transactions.tsx, TransactionForm.tsx, Categories.tsx, Reports.tsx, Organizations.tsx, OrgMembers.tsx
     lib/       queryClient.ts, formatters.ts
+  backend/.dockerignore
+  frontend/.dockerignore
 ```
 
 ## Database (10 tabeller)
@@ -77,39 +79,45 @@ summa-summarum/
 
 ## API-endepunkter
 
-| Metode | Endepunkt | Tilgang |
-|--------|-----------|---------|
-| POST | `/api/auth/request-code` | Offentlig |
-| POST | `/api/auth/verify-code` | Offentlig |
-| POST | `/api/auth/logout` | Offentlig |
-| GET | `/api/auth/me` | Autentisert |
-| POST | `/api/auth/switch-org/{orgId}` | Autentisert medlem/superadmin |
-| GET/POST | `/api/categories` | GET: Admin+, POST: Superadmin |
-| PUT/DELETE | `/api/categories/{id}` | Superadmin |
-| GET/POST | `/api/transactions` | Org-medlem (scoped) |
-| GET/PUT/DELETE | `/api/transactions/{id}` | Org-medlem (scoped) |
-| POST | `/api/transactions/{id}/attachments` | Org-medlem (scoped) |
-| GET/DELETE | `/api/transactions/{id}/attachments/{aid}` | Org-medlem (scoped) |
-| GET | `/api/reports/overview` | Org-medlem (scoped) |
-| GET | `/api/reports/monthly?year=` | Org-medlem (scoped) |
-| GET | `/api/reports/categories?year=&month=` | Org-medlem (scoped) |
-| GET | `/api/reports/yearly` | Org-medlem (scoped) |
-| GET | `/api/reports/mva?year=&month=` | Org-medlem (scoped) |
-| GET | `/api/exchange-rate?currency=&date=` | Org-medlem |
-| GET | `/api/organizations` | Autentisert |
-| POST | `/api/organizations` | Superadmin |
-| PUT | `/api/organizations/{id}` | Superadmin |
-| GET | `/api/organizations/{id}/members` | Superadmin / org-oppretter |
-| POST | `/api/organizations/{id}/members` | Superadmin / org-oppretter |
-| DELETE | `/api/organizations/{id}/members/{userId}` | Superadmin / org-oppretter |
+| Metode | Endepunkt | Tilgang | CSRF |
+|--------|-----------|---------|------|
+| POST | `/api/auth/request-code` | Offentlig | Nei |
+| POST | `/api/auth/verify-code` | Offentlig | Nei |
+| POST | `/api/auth/logout` | Offentlig | Nei |
+| GET | `/api/auth/me` | Autentisert | Nei |
+| POST | `/api/auth/switch-org/{orgId}` | Autentisert medlem/superadmin | Nei |
+| GET | `/api/categories` | Admin+ | Nei |
+| POST | `/api/categories` | Superadmin | Ja |
+| PUT/DELETE | `/api/categories/{id}` | Superadmin | Ja |
+| GET | `/api/transactions` | Org-medlem (scoped) | Nei |
+| POST | `/api/transactions` | Org-medlem (scoped) | Ja |
+| GET | `/api/transactions/{id}` | Org-medlem (scoped) | Nei |
+| PUT/DELETE | `/api/transactions/{id}` | Org-medlem (scoped) | Ja |
+| POST | `/api/transactions/{id}/attachments` | Org-medlem (scoped) | Ja |
+| GET | `/api/transactions/{id}/attachments/{aid}` | Org-medlem (scoped) | Nei |
+| DELETE | `/api/transactions/{id}/attachments/{aid}` | Org-medlem (scoped) | Ja |
+| GET | `/api/reports/overview` | Org-medlem (scoped) | Nei |
+| GET | `/api/reports/monthly?year=` | Org-medlem (scoped) | Nei |
+| GET | `/api/reports/categories?year=&month=` | Org-medlem (scoped) | Nei |
+| GET | `/api/reports/yearly` | Org-medlem (scoped) | Nei |
+| GET | `/api/reports/mva?year=&month=` | Org-medlem (scoped) | Nei |
+| GET | `/api/exchange-rate?currency=&date=` | Org-medlem | Nei |
+| GET | `/api/organizations` | Autentisert | Nei |
+| POST | `/api/organizations` | Superadmin | Ja |
+| PUT | `/api/organizations/{id}` | Superadmin | Ja |
+| GET | `/api/organizations/{id}/members` | Superadmin / org-oppretter | Nei |
+| POST | `/api/organizations/{id}/members` | Superadmin / org-oppretter | Ja |
+| DELETE | `/api/organizations/{id}/members/{userId}` | Superadmin / org-oppretter | Ja |
 
 ## Konvensjoner
 
 - Exposed DSL for database (ikke DAO)
 - `TimeUtils.nowOslo()` for konsistent norsk tid
 - API-stier i frontend uten `/api`-prefix (apiClient legger det til)
-- CSRF-token på POST/PUT/DELETE via X-CSRF-Token header
-- Dev-modus: OTP "123456" fungerer alltid
+- CSRF-verifisering: Alle POST/PUT/DELETE-routes kaller `verifyCsrf(authService)`. Frontend sender X-CSRF-Token header.
+- AuditLog: Alle CUD-operasjoner på transaksjoner, kategorier, organisasjoner og vedlegg logges via `AuditLogService`
+- Dev-modus: OTP "123456" fungerer kun når `DEV_MODE=true`
+- SQL-søk escaper `%`, `_` og `\` for å forhindre wildcard-injection
 
 ## Porter
 
@@ -122,6 +130,9 @@ summa-summarum/
 ## Miljøvariabler
 
 Se `.env.example` for komplett mal.
+
+- `JWT_SECRET` — **Påkrevd**. Applikasjonen kaster `IllegalStateException` ved oppstart hvis den mangler.
+- `DEV_MODE` — Sett til `true` for dev-modus (OTP "123456" fungerer). Erstatter tidligere `KTOR_ENV`.
 
 ## Cloudflare Tunnel
 

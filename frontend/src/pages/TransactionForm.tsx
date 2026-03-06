@@ -79,7 +79,7 @@ export function TransactionForm() {
       const rate = parseFloat(formData.vatRate)
       const amount = parseFloat(formData.amount)
       if (!isNaN(rate) && !isNaN(amount) && rate > 0) {
-        const vatAmount = (amount * rate / (100 + rate)).toFixed(2)
+        const vatAmount = (Math.round(amount * rate / (100 + rate) * 100) / 100).toFixed(2)
         setFormData(prev => ({ ...prev, vatAmount }))
       }
     }

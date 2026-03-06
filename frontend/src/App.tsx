@@ -4,6 +4,7 @@ import { queryClient } from './lib/queryClient'
 import { AuthProvider } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
+import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { TransactionForm } from './pages/TransactionForm'
@@ -18,6 +19,8 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/login" element={<Login />} />
+
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout><Dashboard /></Layout>

@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext'
 
 export function Organizations() {
   const queryClient = useQueryClient()
-  const { refreshOrganizations } = useAuth()
+  const { refreshOrganizations, user } = useAuth()
+  const isSuperAdmin = user?.role === 'SUPERADMIN'
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ name: '', orgNumber: '', mvaRegistered: false })
 
@@ -56,15 +57,17 @@ export function Organizations() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Organisasjoner</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-summa-700 text-white px-4 py-2 rounded-lg hover:bg-summa-800 transition-colors"
-        >
-          Ny organisasjon
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-summa-700 text-white px-4 py-2 rounded-lg hover:bg-summa-800 transition-colors"
+          >
+            Ny organisasjon
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {isSuperAdmin && showForm && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Ny organisasjon</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -138,15 +141,21 @@ export function Organizations() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={org.mvaRegistered}
-                    onChange={() => toggleMva(org)}
-                    className="rounded border-gray-300 text-summa-600 focus:ring-summa-500"
-                  />
-                  <span className="text-gray-600">MVA</span>
-                </label>
+                {isSuperAdmin ? (
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={org.mvaRegistered}
+                      onChange={() => toggleMva(org)}
+                      className="rounded border-gray-300 text-summa-600 focus:ring-summa-500"
+                    />
+                    <span className="text-gray-600">MVA</span>
+                  </label>
+                ) : (
+                  org.mvaRegistered && (
+                    <span className="text-sm text-gray-500">MVA-registrert</span>
+                  )
+                )}
               </div>
             </div>
           ))}

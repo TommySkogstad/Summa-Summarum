@@ -28,6 +28,24 @@ object Seed {
                 logger.info("Opprettet default organisasjon: $orgName (id=$orgId)")
             }
 
+            // Opprett admin-testbruker hvis ingen brukere finnes
+            if (Users.selectAll().empty()) {
+                val userId = Users.insertAndGetId {
+                    it[email] = "admin@test.no"
+                    it[name] = "Admin Testbruker"
+                    it[role] = UserRole.SUPERADMIN
+                    it[active] = true
+                }.value
+
+                val firstOrgId = Organizations.selectAll().first()[Organizations.id].value
+                UserOrganizations.insert {
+                    it[UserOrganizations.userId] = userId
+                    it[UserOrganizations.organizationId] = firstOrgId
+                }
+
+                logger.info("Opprettet testbruker: admin@test.no (SUPERADMIN, org=$firstOrgId)")
+            }
+
             // Opprett standard kontoplan hvis ingen kategorier finnes
             if (Categories.selectAll().empty()) {
                 val defaultCategories = listOf(

@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getCategories, createCategory, updateCategory, deleteCategory, Category } from '../api/categories'
+import { useAuth } from '../context/AuthContext'
 
 export function Categories() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const isSuperAdmin = user?.role === 'SUPERADMIN'
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formData, setFormData] = useState({ code: '', name: '', type: 'UTGIFT' as Category['type'] })
@@ -76,19 +79,21 @@ export function Categories() {
         {cat.isDefault && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Standard</span>}
         {!cat.active && <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">Deaktivert</span>}
       </div>
-      <div className="flex gap-2">
-        <button onClick={() => handleToggleActive(cat)} className="text-sm text-gray-500 hover:text-gray-700">
-          {cat.active ? 'Deaktiver' : 'Aktiver'}
-        </button>
-        <button onClick={() => handleEdit(cat)} className="text-sm text-summa-600 hover:text-summa-800">
-          Rediger
-        </button>
-        {!cat.isDefault && (
-          <button onClick={() => deleteMutation.mutate(cat.id)} className="text-sm text-red-600 hover:text-red-800">
-            Slett
+      {isSuperAdmin && (
+        <div className="flex gap-2">
+          <button onClick={() => handleToggleActive(cat)} className="text-sm text-gray-500 hover:text-gray-700">
+            {cat.active ? 'Deaktiver' : 'Aktiver'}
           </button>
-        )}
-      </div>
+          <button onClick={() => handleEdit(cat)} className="text-sm text-summa-600 hover:text-summa-800">
+            Rediger
+          </button>
+          {!cat.isDefault && (
+            <button onClick={() => deleteMutation.mutate(cat.id)} className="text-sm text-red-600 hover:text-red-800">
+              Slett
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 
@@ -96,15 +101,17 @@ export function Categories() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Kontoplan</h1>
-        <button
-          onClick={() => { resetForm(); setShowForm(true) }}
-          className="bg-summa-700 text-white px-4 py-2 rounded-lg hover:bg-summa-800 transition-colors"
-        >
-          Ny kategori
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => { resetForm(); setShowForm(true) }}
+            className="bg-summa-700 text-white px-4 py-2 rounded-lg hover:bg-summa-800 transition-colors"
+          >
+            Ny kategori
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {isSuperAdmin && showForm && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">{editingId ? 'Rediger kategori' : 'Ny kategori'}</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">

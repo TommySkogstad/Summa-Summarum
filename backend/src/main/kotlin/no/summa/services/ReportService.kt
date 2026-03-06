@@ -123,31 +123,27 @@ class ReportService {
 
         val orgFilter: Op<Boolean> = Transactions.organizationId eq organizationId
 
-        val categories = Transactions.innerJoin(Categories)
-            .select(
-                Categories.id,
-                Categories.code,
-                Categories.name,
-                Categories.type,
-                Transactions.amount.sum(),
-                Transactions.id.count()
-            )
+        val rows = Transactions.innerJoin(Categories)
+            .selectAll()
             .where {
                 orgFilter and
                 (Transactions.date greaterEq startDate) and (Transactions.date less endDate)
             }
-            .groupBy(Categories.id, Categories.code, Categories.name, Categories.type)
-            .orderBy(Categories.code, SortOrder.ASC)
-            .map { row ->
+            .toList()
+
+        val categories = rows
+            .groupBy { Triple(it[Categories.id].value, it[Categories.code], it[Categories.name]) }
+            .map { (key, groupRows) ->
                 CategoryReportRow(
-                    categoryId = row[Categories.id].value,
-                    categoryCode = row[Categories.code],
-                    categoryName = row[Categories.name],
-                    type = row[Categories.type].name,
-                    total = (row[Transactions.amount.sum()] ?: BigDecimal.ZERO).toPlainString(),
-                    count = row[Transactions.id.count()].toInt()
+                    categoryId = key.first,
+                    categoryCode = key.second,
+                    categoryName = key.third,
+                    type = groupRows.first()[Categories.type].name,
+                    total = groupRows.fold(BigDecimal.ZERO) { acc, row -> acc + effectiveAmount(row) }.toPlainString(),
+                    count = groupRows.size
                 )
             }
+            .sortedBy { it.categoryCode }
 
         CategoryReportResponse(year = year, month = month, categories = categories)
     }

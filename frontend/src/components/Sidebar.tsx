@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export function Sidebar() {
-  const { organizations, activeOrg, switchOrganization } = useAuth()
+  const { user, organizations, activeOrg, switchOrganization, logout } = useAuth()
 
   const links = [
     { to: '/', label: 'Dashboard' },
@@ -57,6 +57,19 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {user && (
+        <div className="p-4 border-t border-summa-700">
+          <p className="text-summa-300 text-sm truncate">{user.name}</p>
+          <p className="text-summa-500 text-xs truncate">{user.email}</p>
+          <button
+            onClick={logout}
+            className="mt-2 text-summa-400 hover:text-white text-sm transition-colors"
+          >
+            Logg ut
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

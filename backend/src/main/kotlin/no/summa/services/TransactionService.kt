@@ -15,6 +15,14 @@ import java.util.UUID
 class TransactionService(private val documentParserService: DocumentParserService? = null) {
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
     private val uploadDir = File("/app/uploads/attachments")
+    private val allowedMimeTypes = setOf(
+        "image/jpeg", "image/png", "image/gif",
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     init {
         uploadDir.mkdirs()
@@ -45,8 +53,12 @@ class TransactionService(private val documentParserService: DocumentParserServic
 
         search?.let { s ->
             if (s.isNotBlank()) {
+                val escaped = s.lowercase()
+                    .replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_")
                 query = query.andWhere {
-                    Transactions.description.lowerCase() like "%${s.lowercase()}%"
+                    Transactions.description.lowerCase() like "%${escaped}%"
                 }
             }
         }
@@ -63,18 +75,44 @@ class TransactionService(private val documentParserService: DocumentParserServic
 
         val total = query.count().toInt()
 
-        val transactions = query
+        val rows = query
             .orderBy(Transactions.date, SortOrder.DESC)
             .limit(pageSize)
             .offset(((page - 1) * pageSize).toLong())
-            .map { row ->
-                val txId = row[Transactions.id].value
-                val attachments = Attachments.selectAll()
-                    .where { Attachments.transactionId eq txId }
-                    .map { toAttachmentDTO(it) }
+            .toList()
 
-                toDTO(row, attachments)
-            }
+        val txIds = rows.map { it[Transactions.id].value }
+
+        // Batch-hent alle vedlegg for disse transaksjonene
+        val attachmentsByTx = if (txIds.isNotEmpty()) {
+            val allAttachments = Attachments.selectAll()
+                .where { Attachments.transactionId inList txIds }
+                .toList()
+
+            // Batch-hent parsed documents for alle vedlegg
+            val attachmentIds = allAttachments.map { it[Attachments.id].value }
+            val parsedDocs = if (attachmentIds.isNotEmpty()) {
+                ParsedDocuments.selectAll()
+                    .where { ParsedDocuments.attachmentId inList attachmentIds }
+                    .associateBy { it[ParsedDocuments.attachmentId].value }
+            } else emptyMap()
+
+            val parsedDocIds = parsedDocs.values.map { it[ParsedDocuments.id].value }
+            val lineItemsByDoc = if (parsedDocIds.isNotEmpty()) {
+                ParsedLineItems.selectAll()
+                    .where { ParsedLineItems.parsedDocumentId inList parsedDocIds }
+                    .groupBy { it[ParsedLineItems.parsedDocumentId].value }
+            } else emptyMap()
+
+            allAttachments.groupBy { it[Attachments.transactionId].value }
+                .mapValues { (_, attRows) ->
+                    attRows.map { attRow -> toAttachmentDTOBatch(attRow, parsedDocs, lineItemsByDoc) }
+                }
+        } else emptyMap()
+
+        val transactions = rows.map { row ->
+            toDTO(row, attachmentsByTx[row[Transactions.id].value] ?: emptyList())
+        }
 
         TransactionListResponse(
             transactions = transactions,
@@ -186,6 +224,10 @@ class TransactionService(private val documentParserService: DocumentParserServic
         Transactions.selectAll()
             .where { (Transactions.id eq transactionId) and (Transactions.organizationId eq organizationId) }
             .singleOrNull() ?: return@transaction null
+
+        if (mimeType !in allowedMimeTypes) {
+            return@transaction null
+        }
 
         val extension = originalName.substringAfterLast('.', "bin")
         val filename = "${UUID.randomUUID()}.$extension"
@@ -308,6 +350,56 @@ class TransactionService(private val documentParserService: DocumentParserServic
     private fun toAttachmentDTO(row: ResultRow): AttachmentDTO {
         val attachmentId = row[Attachments.id].value
         val parsedDoc = documentParserService?.getParsedDocument(attachmentId)
+
+        return AttachmentDTO(
+            id = attachmentId,
+            transactionId = row[Attachments.transactionId].value,
+            filename = row[Attachments.filename],
+            originalName = row[Attachments.originalName],
+            mimeType = row[Attachments.mimeType],
+            createdAt = row[Attachments.createdAt].format(dateFormatter),
+            parsedDocument = parsedDoc
+        )
+    }
+
+    private fun toAttachmentDTOBatch(
+        row: ResultRow,
+        parsedDocs: Map<Int, ResultRow>,
+        lineItemsByDoc: Map<Int, List<ResultRow>>
+    ): AttachmentDTO {
+        val attachmentId = row[Attachments.id].value
+        val parsedDocRow = parsedDocs[attachmentId]
+        val parsedDoc = parsedDocRow?.let { pdRow ->
+            val docId = pdRow[ParsedDocuments.id].value
+            val lineItems = lineItemsByDoc[docId]?.map { li ->
+                ParsedLineItemDTO(
+                    description = li[ParsedLineItems.description],
+                    quantity = li[ParsedLineItems.quantity]?.toPlainString(),
+                    unitPrice = li[ParsedLineItems.unitPrice]?.toPlainString(),
+                    amount = li[ParsedLineItems.amount]?.toPlainString(),
+                    vatRate = li[ParsedLineItems.vatRate]?.toPlainString(),
+                    vatAmount = li[ParsedLineItems.vatAmount]?.toPlainString()
+                )
+            } ?: emptyList()
+
+            ParsedDocumentDTO(
+                id = docId,
+                totalAmount = pdRow[ParsedDocuments.totalAmount]?.toPlainString(),
+                currency = pdRow[ParsedDocuments.currency],
+                vatAmount = pdRow[ParsedDocuments.vatAmount]?.toPlainString(),
+                vatRate = pdRow[ParsedDocuments.vatRate]?.toPlainString(),
+                invoiceDate = pdRow[ParsedDocuments.invoiceDate],
+                paymentDueDate = pdRow[ParsedDocuments.paymentDueDate],
+                paymentReference = pdRow[ParsedDocuments.paymentReference],
+                vendorName = pdRow[ParsedDocuments.vendorName],
+                vendorOrgNumber = pdRow[ParsedDocuments.vendorOrgNumber],
+                invoiceNumber = pdRow[ParsedDocuments.invoiceNumber],
+                confidence = pdRow[ParsedDocuments.confidence]?.toPlainString(),
+                status = pdRow[ParsedDocuments.status].name,
+                errorMessage = pdRow[ParsedDocuments.errorMessage],
+                lineItems = lineItems
+            )
+        }
 
         return AttachmentDTO(
             id = attachmentId,
