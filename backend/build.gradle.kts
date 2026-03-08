@@ -37,7 +37,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:6.2.1")
 
     // Anthropic SDK (Claude Vision for document parsing)
-    implementation("com.anthropic:anthropic-java:2.15.0")
+    implementation("com.anthropic:anthropic-java:2.16.0")
 
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.15")
