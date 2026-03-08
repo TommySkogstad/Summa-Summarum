@@ -40,7 +40,7 @@ dependencies {
     implementation("com.anthropic:anthropic-java:2.16.0")
 
     // Logging
-    implementation("ch.qos.logback:logback-classic:1.5.15")
+    implementation("ch.qos.logback:logback-classic:1.5.32")
 
     // Testing
     testImplementation("io.ktor:ktor-server-test-host")
