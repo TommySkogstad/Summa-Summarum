@@ -3,6 +3,7 @@ build/
 node_modules/
 dist/
 *.jar
+!backend/gradle/wrapper/gradle-wrapper.jar
 .idea/
 *.iml
 .DS_Store
