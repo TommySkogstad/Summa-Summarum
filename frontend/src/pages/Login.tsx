@@ -38,7 +38,7 @@ export function Login() {
     setError(null)
     setLoading(true)
     try {
-      const result = await verifyCode(email, code)
+      await verifyCode(email, code)
       onLogin()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ugyldig kode')
