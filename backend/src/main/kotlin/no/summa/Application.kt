@@ -3,6 +3,9 @@ package no.summa
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import no.grunnmur.AuditLogService
+import no.grunnmur.GrunnmurCsrf
+import no.grunnmur.RateLimiter
 import no.summa.plugins.*
 import no.summa.services.*
 
@@ -29,6 +32,14 @@ fun Application.module() {
     configureSerialization()
     configureSecurity()
     configureAuth(authService)
+    install(GrunnmurCsrf) {
+        exemptPaths = setOf(
+            "/api/auth/request-code",
+            "/api/auth/verify-code",
+            "/api/auth/logout",
+            "/api/health"
+        )
+    }
     configureDatabase()
     configureRouting(
         authService = authService,

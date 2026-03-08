@@ -6,11 +6,9 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.summa.models.*
+import no.grunnmur.AuditLogService
 import no.summa.plugins.getUserId
 import no.summa.plugins.requireOrgId
-import no.summa.plugins.verifyCsrf
-import no.summa.services.AuditLogService
-import no.summa.services.AuthService
 import no.summa.services.DocumentParserService
 import no.summa.services.ParseResult
 import no.summa.services.TransactionService
@@ -19,7 +17,6 @@ import no.summa.utils.Validators
 fun Route.transactionRoutes(
     transactionService: TransactionService,
     documentParserService: DocumentParserService?,
-    authService: AuthService,
     auditLogService: AuditLogService
 ) {
     get("/attachments") {
@@ -28,8 +25,6 @@ fun Route.transactionRoutes(
     }
 
     post("/parse-document") {
-        if (!call.verifyCsrf(authService)) return@post
-
         if (documentParserService == null || !documentParserService.isEnabled) {
             call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Dokumentparsing er ikke aktivert"))
             return@post
@@ -114,7 +109,6 @@ fun Route.transactionRoutes(
         }
 
         post {
-            if (!call.verifyCsrf(authService)) return@post
             val orgId = call.requireOrgId() ?: return@post
             val request = call.receive<CreateTransactionRequest>()
 
@@ -164,7 +158,6 @@ fun Route.transactionRoutes(
         }
 
         put("/{id}") {
-            if (!call.verifyCsrf(authService)) return@put
             val orgId = call.requireOrgId() ?: return@put
             val id = call.parameters["id"]?.toIntOrNull()
                 ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig ID"))
@@ -188,7 +181,6 @@ fun Route.transactionRoutes(
         }
 
         delete("/{id}") {
-            if (!call.verifyCsrf(authService)) return@delete
             val orgId = call.requireOrgId() ?: return@delete
             val id = call.parameters["id"]?.toIntOrNull()
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig ID"))
@@ -210,7 +202,6 @@ fun Route.transactionRoutes(
 
         // Vedlegg
         post("/{id}/attachments") {
-            if (!call.verifyCsrf(authService)) return@post
             val orgId = call.requireOrgId() ?: return@post
             val transactionId = call.parameters["id"]?.toIntOrNull()
                 ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig transaksjons-ID"))
@@ -277,7 +268,6 @@ fun Route.transactionRoutes(
         }
 
         delete("/{id}/attachments/{aid}") {
-            if (!call.verifyCsrf(authService)) return@delete
             val orgId = call.requireOrgId() ?: return@delete
             val attachmentId = call.parameters["aid"]?.toIntOrNull()
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig vedleggs-ID"))

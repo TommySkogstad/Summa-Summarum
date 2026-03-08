@@ -38,7 +38,10 @@ services:
           cpus: '0.25'
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      additional_contexts:
+        grunnmur: ../grunnmur
     restart: unless-stopped
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-summa}

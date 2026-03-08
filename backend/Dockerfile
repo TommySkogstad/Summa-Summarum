@@ -18,6 +18,7 @@ RUN if [ -f /tmp/corporate-ca.pem ]; then \
     fi
 
 COPY build.gradle.kts settings.gradle.kts ./
+COPY --from=grunnmur . ./grunnmur/
 RUN gradle dependencies --no-daemon
 
 COPY src ./src

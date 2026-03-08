@@ -16,6 +16,9 @@ repositories {
 }
 
 dependencies {
+    // Grunnmur: felles bibliotek
+    implementation("no.grunnmur:grunnmur:1.0.0")
+
     // Ktor
     implementation("io.ktor:ktor-server-core")
     implementation("io.ktor:ktor-server-netty")

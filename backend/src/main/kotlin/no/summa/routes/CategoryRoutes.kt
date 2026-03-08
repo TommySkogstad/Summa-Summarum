@@ -5,14 +5,12 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.summa.models.*
+import no.grunnmur.AuditLogService
 import no.summa.plugins.getUserId
 import no.summa.plugins.requireSuperAdmin
-import no.summa.plugins.verifyCsrf
-import no.summa.services.AuditLogService
-import no.summa.services.AuthService
 import no.summa.services.CategoryService
 
-fun Route.categoryRoutes(categoryService: CategoryService, authService: AuthService, auditLogService: AuditLogService) {
+fun Route.categoryRoutes(categoryService: CategoryService, auditLogService: AuditLogService) {
     route("/categories") {
         get {
             call.respond(categoryService.getAll())
@@ -20,7 +18,6 @@ fun Route.categoryRoutes(categoryService: CategoryService, authService: AuthServ
 
         post {
             if (!call.requireSuperAdmin()) return@post
-            if (!call.verifyCsrf(authService)) return@post
 
             val request = call.receive<CreateCategoryRequest>()
 
@@ -47,7 +44,6 @@ fun Route.categoryRoutes(categoryService: CategoryService, authService: AuthServ
 
         put("/{id}") {
             if (!call.requireSuperAdmin()) return@put
-            if (!call.verifyCsrf(authService)) return@put
 
             val id = call.parameters["id"]?.toIntOrNull()
                 ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig ID"))
@@ -72,7 +68,6 @@ fun Route.categoryRoutes(categoryService: CategoryService, authService: AuthServ
 
         delete("/{id}") {
             if (!call.requireSuperAdmin()) return@delete
-            if (!call.verifyCsrf(authService)) return@delete
 
             val id = call.parameters["id"]?.toIntOrNull()
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig ID"))

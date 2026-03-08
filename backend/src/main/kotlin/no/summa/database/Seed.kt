@@ -1,5 +1,6 @@
 package no.summa.database
 
+import no.grunnmur.TimeUtils
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory

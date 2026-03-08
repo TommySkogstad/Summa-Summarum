@@ -12,6 +12,7 @@
 - **Reverse Proxy**: Nginx (dev: 9200)
 - **Auth**: JWT (HttpOnly cookies) + OTP (passwordless login)
 - **E-post**: Postfix (DKIM-signert, selector: summa) via jakarta.mail
+- **Felles bibliotek**: grunnmur (RouteUtils, TimeUtils, CSRF, RateLimiter, AuditLog, StatusPages)
 - **Deployment**: Docker Compose + Cloudflare Tunnel
 
 ## Kommandoer

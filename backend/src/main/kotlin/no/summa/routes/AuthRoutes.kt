@@ -1,6 +1,7 @@
 package no.summa.routes
 
 import io.ktor.http.*
+import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
@@ -9,7 +10,8 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import no.summa.models.ErrorResponse
 import no.summa.services.AuthService
-import no.summa.services.RateLimiter
+import no.grunnmur.RateLimiter
+import java.util.UUID
 
 @Serializable
 data class RequestCodeRequest(val email: String)
@@ -37,6 +39,24 @@ data class OrgResponse(
     val name: String,
     val mvaRegistered: Boolean
 )
+
+private val isDev = System.getenv("DEV_MODE")?.lowercase() == "true"
+
+private fun setCsrfCookie(call: ApplicationCall): String {
+    val csrfToken = UUID.randomUUID().toString()
+    call.response.cookies.append(
+        Cookie(
+            name = "csrf_token",
+            value = csrfToken,
+            httpOnly = false,
+            secure = !isDev,
+            path = "/",
+            maxAge = 86400,
+            extensions = mapOf("SameSite" to if (isDev) "Lax" else "Strict")
+        )
+    )
+    return csrfToken
+}
 
 fun Route.authRoutes(authService: AuthService, rateLimiter: RateLimiter) {
     route("/auth") {
@@ -72,10 +92,7 @@ fun Route.authRoutes(authService: AuthService, rateLimiter: RateLimiter) {
             val (_, cookie) = result
             call.response.cookies.append(cookie)
 
-            // Hent brukerinfo for CSRF-token
-            val principal = com.auth0.jwt.JWT.decode(cookie.value)
-            val userId = principal.getClaim("userId").asInt()
-            val csrfToken = authService.generateCsrfToken(userId)
+            val csrfToken = setCsrfCookie(call)
 
             rateLimiter.reset(ip)
             rateLimiter.reset("verify:$ip")
@@ -89,6 +106,15 @@ fun Route.authRoutes(authService: AuthService, rateLimiter: RateLimiter) {
                     name = "auth_token",
                     value = "",
                     httpOnly = true,
+                    path = "/",
+                    maxAge = 0
+                )
+            )
+            call.response.cookies.append(
+                Cookie(
+                    name = "csrf_token",
+                    value = "",
+                    httpOnly = false,
                     path = "/",
                     maxAge = 0
                 )
@@ -108,7 +134,7 @@ fun Route.authRoutes(authService: AuthService, rateLimiter: RateLimiter) {
                     return@get
                 }
 
-                val csrfToken = authService.generateCsrfToken(userId)
+                val csrfToken = setCsrfCookie(call)
 
                 call.respond(UserResponse(
                     id = userInfo.id,
@@ -139,7 +165,7 @@ fun Route.authRoutes(authService: AuthService, rateLimiter: RateLimiter) {
                 val (_, cookie) = result
                 call.response.cookies.append(cookie)
 
-                val csrfToken = authService.generateCsrfToken(userId)
+                val csrfToken = setCsrfCookie(call)
                 call.respond(AuthResponse(message = "Byttet organisasjon", csrfToken = csrfToken))
             }
         }

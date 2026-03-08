@@ -1,14 +1,8 @@
 const API_BASE = '/api'
 
-let csrfToken = sessionStorage.getItem('csrf_token') || ''
-
-export function setCsrfToken(token: string) {
-  csrfToken = token
-  if (token) {
-    sessionStorage.setItem('csrf_token', token)
-  } else {
-    sessionStorage.removeItem('csrf_token')
-  }
+function getCsrfTokenFromCookie(): string {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/)
+  return match ? decodeURIComponent(match[1]) : ''
 }
 
 function buildHeaders(
@@ -21,9 +15,12 @@ function buildHeaders(
     headers['Content-Type'] = contentType
   }
 
-  // Legg til CSRF-token på muterende operasjoner
-  if (method && method !== 'GET' && method !== 'HEAD' && csrfToken) {
-    headers['X-CSRF-Token'] = csrfToken
+  // Legg til CSRF-token pa muterende operasjoner (leses fra cookie)
+  if (method && method !== 'GET' && method !== 'HEAD') {
+    const csrfToken = getCsrfTokenFromCookie()
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken
+    }
   }
 
   return headers
@@ -79,9 +76,12 @@ export async function apiFormDataRequest<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {}
 
-  // CSRF-token på muterende operasjoner
-  if (method !== 'GET' && method !== 'HEAD' && csrfToken) {
-    headers['X-CSRF-Token'] = csrfToken
+  // CSRF-token pa muterende operasjoner (leses fra cookie)
+  if (method !== 'GET' && method !== 'HEAD') {
+    const csrfToken = getCsrfTokenFromCookie()
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken
+    }
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {

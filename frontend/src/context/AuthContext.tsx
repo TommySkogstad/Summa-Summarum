@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { getMe, switchOrg, logout as apiLogout, type AuthUser } from '../api/auth'
 import { queryClient } from '../lib/queryClient'
-import { setCsrfToken } from '../api/apiClient'
 
 interface AuthContextType {
   user: AuthUser | null
@@ -11,11 +10,16 @@ interface AuthContextType {
   authenticated: boolean
   switchOrganization: (orgId: number) => Promise<void>
   refreshOrganizations: () => Promise<void>
-  onLogin: (csrfToken?: string) => void
+  onLogin: () => void
   logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+function getCsrfTokenFromCookie(): string {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/)
+  return match ? decodeURIComponent(match[1]) : ''
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -25,9 +29,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const me = await getMe()
       setUser(me)
-      if (me.csrfToken) {
-        setCsrfToken(me.csrfToken)
-      }
     } catch {
       setUser(null)
     } finally {
@@ -39,17 +40,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchUser()
   }, [fetchUser])
 
-  const onLogin = useCallback((csrfToken?: string) => {
-    if (csrfToken) setCsrfToken(csrfToken)
+  const onLogin = useCallback(() => {
     fetchUser()
   }, [fetchUser])
 
   const switchOrganization = useCallback(async (orgId: number) => {
-    const token = getCsrfTokenFromStorage()
+    const token = getCsrfTokenFromCookie()
     if (!token) return
     try {
-      const result = await switchOrg(orgId, token)
-      if (result.csrfToken) setCsrfToken(result.csrfToken)
+      await switchOrg(orgId, token)
       queryClient.clear()
       await fetchUser()
     } catch (err) {
@@ -60,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await apiLogout()
     setUser(null)
-    setCsrfToken('')
     queryClient.clear()
   }, [])
 
@@ -94,9 +92,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within AuthProvider')
   }
   return context
-}
-
-// Intern hjelpefunksjon
-function getCsrfTokenFromStorage(): string | null {
-  return sessionStorage.getItem('csrf_token')
 }

@@ -5,14 +5,12 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.summa.models.*
+import no.grunnmur.AuditLogService
 import no.summa.plugins.getUserId
 import no.summa.plugins.requireSuperAdmin
-import no.summa.plugins.verifyCsrf
-import no.summa.services.AuditLogService
-import no.summa.services.AuthService
 import no.summa.services.OrganizationService
 
-fun Route.organizationRoutes(organizationService: OrganizationService, authService: AuthService, auditLogService: AuditLogService) {
+fun Route.organizationRoutes(organizationService: OrganizationService, auditLogService: AuditLogService) {
     route("/organizations") {
         get {
             call.respond(organizationService.getAll())
@@ -20,7 +18,6 @@ fun Route.organizationRoutes(organizationService: OrganizationService, authServi
 
         post {
             if (!call.requireSuperAdmin()) return@post
-            if (!call.verifyCsrf(authService)) return@post
 
             val request = call.receive<CreateOrganizationRequest>()
 
@@ -47,7 +44,6 @@ fun Route.organizationRoutes(organizationService: OrganizationService, authServi
 
         put("/{id}") {
             if (!call.requireSuperAdmin()) return@put
-            if (!call.verifyCsrf(authService)) return@put
 
             val id = call.parameters["id"]?.toIntOrNull()
                 ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Ugyldig ID"))

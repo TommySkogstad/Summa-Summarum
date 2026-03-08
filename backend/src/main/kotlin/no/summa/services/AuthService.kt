@@ -3,6 +3,7 @@ package no.summa.services
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.http.*
+import no.grunnmur.TimeUtils
 import no.summa.database.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -155,23 +156,6 @@ class AuthService(
             role = user[Users.role].name,
             organizations = allOrgs
         )
-    }
-
-    fun generateCsrfToken(userId: Int): String {
-        return JWT.create()
-            .withClaim("userId", userId)
-            .withClaim("type", "csrf")
-            .withExpiresAt(java.util.Date(System.currentTimeMillis() + 86400000))
-            .sign(algorithm)
-    }
-
-    fun verifyCsrfToken(token: String, userId: Int): Boolean {
-        return try {
-            val decoded = JWT.require(algorithm).build().verify(token)
-            decoded.getClaim("userId").asInt() == userId && decoded.getClaim("type").asString() == "csrf"
-        } catch (e: Exception) {
-            false
-        }
     }
 
     private fun generateToken(userId: Int, email: String, role: String, orgId: Int?): String {

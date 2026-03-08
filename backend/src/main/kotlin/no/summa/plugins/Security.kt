@@ -4,17 +4,12 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
+import no.grunnmur.grunnmurExceptionHandlers
 import no.summa.models.ErrorResponse
 
 fun Application.configureSecurity() {
     install(StatusPages) {
-        exception<Throwable> { call, cause ->
-            call.application.log.error("Unhandled exception", cause)
-            call.respond(
-                HttpStatusCode.InternalServerError,
-                ErrorResponse("En intern feil oppstod")
-            )
-        }
+        grunnmurExceptionHandlers()
 
         status(HttpStatusCode.NotFound) { call, status ->
             call.respond(status, ErrorResponse("Ressurs ikke funnet"))

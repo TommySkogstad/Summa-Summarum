@@ -17,7 +17,10 @@ services:
       - summa-network
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      additional_contexts:
+        grunnmur: ../grunnmur
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/summa
       DATABASE_USER: summa

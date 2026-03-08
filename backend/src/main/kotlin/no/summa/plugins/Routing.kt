@@ -5,6 +5,8 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.routing.*
+import no.grunnmur.AuditLogService
+import no.grunnmur.RateLimiter
 import no.summa.routes.*
 import no.summa.services.*
 
@@ -47,10 +49,10 @@ fun Application.configureRouting(
 
             // Beskyttede endepunkter
             authenticate("auth-jwt") {
-                categoryRoutes(categoryService, authService, auditLogService)
-                transactionRoutes(transactionService, documentParserService, authService, auditLogService)
+                categoryRoutes(categoryService, auditLogService)
+                transactionRoutes(transactionService, documentParserService, auditLogService)
                 reportRoutes(reportService, exchangeRateService)
-                organizationRoutes(organizationService, authService, auditLogService)
+                organizationRoutes(organizationService, auditLogService)
             }
         }
     }

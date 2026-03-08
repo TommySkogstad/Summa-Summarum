@@ -1,14 +1,8 @@
 package no.summa.database
 
+import no.grunnmur.TimeUtils
 import org.jetbrains.exposed.dao.id.IntIdTable
 import org.jetbrains.exposed.sql.javatime.datetime
-import java.time.LocalDateTime
-import java.time.ZoneId
-
-object TimeUtils {
-    private val osloZone = ZoneId.of("Europe/Oslo")
-    fun nowOslo(): LocalDateTime = LocalDateTime.now(osloZone)
-}
 
 // Transaksjonstyper
 enum class TransactionType { INNTEKT, UTGIFT }
@@ -124,16 +118,6 @@ object ParsedLineItems : IntIdTable("parsed_line_items") {
     val vatAmount = decimal("vat_amount", 12, 2).nullable()
 }
 
-object AuditLogs : IntIdTable("audit_logs") {
-    val userId = reference("user_id", Users).nullable()
-    val action = varchar("action", 100)
-    val entityType = varchar("entity_type", 100)
-    val entityId = integer("entity_id").nullable()
-    val details = text("details").nullable()
-    val ipAddress = varchar("ip_address", 45)
-    val createdAt = datetime("created_at").clientDefault { TimeUtils.nowOslo() }
-}
-
 object EmailLog : IntIdTable("email_log") {
     val toEmail = varchar("to_email", 255)
     val subject = varchar("subject", 500)
@@ -147,5 +131,5 @@ val allTables = arrayOf(
     Users, Organizations, UserOrganizations,
     Categories, Transactions, Attachments,
     ParsedDocuments, ParsedLineItems,
-    AuditLogs, EmailLog
+    no.grunnmur.AuditLogs, EmailLog
 )
