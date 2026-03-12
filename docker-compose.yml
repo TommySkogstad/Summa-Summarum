@@ -49,11 +49,21 @@ services:
       start_period: 60s
     networks:
       - summa-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
 
   frontend:
     build: ./frontend
     networks:
       - summa-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
 
   postgres:
     image: postgres:16-alpine
@@ -70,6 +80,11 @@ services:
       retries: 5
     networks:
       - summa-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
 
   postfix:
     image: boky/postfix:latest
