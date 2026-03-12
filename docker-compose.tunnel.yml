@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'cloudflared.*tunnel' > /dev/null || exit 1"]
+      test: ["CMD", "cloudflared", "version"]
       interval: 30s
       timeout: 10s
       retries: 3
