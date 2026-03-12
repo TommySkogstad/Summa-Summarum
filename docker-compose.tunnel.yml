@@ -167,7 +167,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f backup-entrypoint || exit 1"]
+      test: ["CMD-SHELL", "test -f /tmp/last-backup-success && [ $(($(date +%s) - $(cat /tmp/last-backup-success))) -lt 93600 ]"]
       interval: 60s
       timeout: 10s
       retries: 3
