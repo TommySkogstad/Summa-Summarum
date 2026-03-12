@@ -7,6 +7,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.summa.models.*
 import no.grunnmur.AuditLogService
+import no.grunnmur.getClientIp
 import no.summa.plugins.getUserId
 import no.summa.plugins.requireOrgId
 import no.summa.services.DocumentParserService
@@ -136,7 +137,7 @@ fun Route.transactionRoutes(
                     entityType = "Transaction",
                     entityId = transaction.id,
                     details = "Opprettet transaksjon: ${transaction.description} (${transaction.amount} ${transaction.currency})",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(HttpStatusCode.Created, transaction)
             } catch (e: Exception) {
@@ -172,7 +173,7 @@ fun Route.transactionRoutes(
                     entityType = "Transaction",
                     entityId = id,
                     details = "Oppdatert transaksjon: ${updated.description}",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(updated)
             } else {
@@ -192,7 +193,7 @@ fun Route.transactionRoutes(
                     entityType = "Transaction",
                     entityId = id,
                     details = "Slettet transaksjon",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(MessageResponse("Transaksjon slettet"))
             } else {
@@ -239,7 +240,7 @@ fun Route.transactionRoutes(
                     entityType = "Attachment",
                     entityId = attachment!!.id,
                     details = "Lastet opp vedlegg: ${attachment!!.originalName}",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(HttpStatusCode.Created, attachment!!)
             } else {
@@ -279,7 +280,7 @@ fun Route.transactionRoutes(
                     entityType = "Attachment",
                     entityId = attachmentId,
                     details = "Slettet vedlegg",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(MessageResponse("Vedlegg slettet"))
             } else {

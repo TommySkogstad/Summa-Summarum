@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 import no.summa.models.ErrorResponse
 import no.summa.services.AuthService
 import no.grunnmur.RateLimiter
+import no.grunnmur.getClientIp
 import java.util.UUID
 
 @Serializable
@@ -62,7 +63,7 @@ fun Route.authRoutes(authService: AuthService, rateLimiter: RateLimiter) {
     route("/auth") {
         post("/request-code") {
             val request = call.receive<RequestCodeRequest>()
-            val ip = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+            val ip = call.getClientIp()
 
             if (!rateLimiter.isAllowed(ip)) {
                 call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("For mange forsok. Prov igjen senere."))
@@ -76,7 +77,7 @@ fun Route.authRoutes(authService: AuthService, rateLimiter: RateLimiter) {
 
         post("/verify-code") {
             val request = call.receive<VerifyCodeRequest>()
-            val ip = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+            val ip = call.getClientIp()
 
             if (!rateLimiter.isAllowed("verify:$ip")) {
                 call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("For mange forsok. Prov igjen senere."))

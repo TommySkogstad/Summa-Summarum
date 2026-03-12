@@ -6,6 +6,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.summa.models.*
 import no.grunnmur.AuditLogService
+import no.grunnmur.getClientIp
 import no.summa.plugins.getUserId
 import no.summa.plugins.requireSuperAdmin
 import no.summa.services.OrganizationService
@@ -34,7 +35,7 @@ fun Route.organizationRoutes(organizationService: OrganizationService, auditLogS
                     entityType = "Organization",
                     entityId = org.id,
                     details = "Opprettet organisasjon ${org.name}",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(HttpStatusCode.Created, org)
             } catch (e: Exception) {
@@ -58,7 +59,7 @@ fun Route.organizationRoutes(organizationService: OrganizationService, auditLogS
                     entityType = "Organization",
                     entityId = id,
                     details = "Oppdatert organisasjon ${updated.name}",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(updated)
             } else {

@@ -6,6 +6,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import no.summa.models.*
 import no.grunnmur.AuditLogService
+import no.grunnmur.getClientIp
 import no.summa.plugins.getUserId
 import no.summa.plugins.requireSuperAdmin
 import no.summa.services.CategoryService
@@ -34,7 +35,7 @@ fun Route.categoryRoutes(categoryService: CategoryService, auditLogService: Audi
                     entityType = "Category",
                     entityId = category.id,
                     details = "Opprettet kategori ${category.code} - ${category.name}",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(HttpStatusCode.Created, category)
             } catch (e: Exception) {
@@ -58,7 +59,7 @@ fun Route.categoryRoutes(categoryService: CategoryService, auditLogService: Audi
                     entityType = "Category",
                     entityId = id,
                     details = "Oppdatert kategori ${updated.code}",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(updated)
             } else {
@@ -79,7 +80,7 @@ fun Route.categoryRoutes(categoryService: CategoryService, auditLogService: Audi
                     entityType = "Category",
                     entityId = id,
                     details = "Slettet/deaktivert kategori",
-                    ipAddress = call.request.header("X-Real-IP") ?: call.request.local.remoteAddress
+                    ipAddress = call.getClientIp()
                 )
                 call.respond(MessageResponse("Kategori slettet"))
             } else {
