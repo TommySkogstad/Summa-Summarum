@@ -6,9 +6,9 @@
 
 ## Teknologier
 
-- **Backend**: Kotlin 2.1 + Ktor 3.0.3 (JVM 21), port 8083
+- **Backend**: Kotlin 2.3.10 + Ktor 3.4.1 (JVM 21), port 8083
 - **Frontend**: React 18 + Vite + TypeScript + Tailwind + TanStack Query, port 5175
-- **Database**: PostgreSQL 16 + Exposed ORM 0.57
+- **Database**: PostgreSQL 16 + Exposed ORM 0.61
 - **Reverse Proxy**: Nginx (dev: 9200)
 - **Auth**: JWT (HttpOnly cookies) + OTP (passwordless login)
 - **E-post**: Postfix (DKIM-signert, selector: summa) via jakarta.mail
