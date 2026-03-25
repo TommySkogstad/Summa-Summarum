@@ -40,16 +40,16 @@ summa-summarum/
     Application.kt
     database/  Tables.kt, Seed.kt
     models/    DTOs.kt
-    plugins/   Auth.kt, CSRF.kt, Database.kt, Routing.kt, Security.kt, Serialization.kt
+    plugins/   Auth.kt, Database.kt, Routing.kt, Security.kt, Serialization.kt
     routes/    AuthRoutes.kt, HealthRoutes.kt, CategoryRoutes.kt, TransactionRoutes.kt, ReportRoutes.kt, OrganizationRoutes.kt
-    services/  AuthService.kt, EmailService.kt, CategoryService.kt, TransactionService.kt, ReportService.kt, OrganizationService.kt, DocumentParserService.kt, ExchangeRateService.kt, AuditLogService.kt, RateLimiter.kt
+    services/  AuthService.kt, CategoryService.kt, DocumentParserService.kt, ExchangeRateService.kt, OrganizationService.kt, ReportService.kt, TransactionService.kt
     utils/     TimeUtils.kt, Validators.kt
   frontend/src/
     App.tsx, main.tsx, index.css
     api/       apiClient.ts, auth.ts, categories.ts, transactions.ts, reports.ts, organizations.ts
     context/   AuthContext.tsx
-    components/ ProtectedRoute.tsx, Layout.tsx, Sidebar.tsx
-    pages/     Login.tsx, Dashboard.tsx, Transactions.tsx, TransactionForm.tsx, Categories.tsx, Reports.tsx, Organizations.tsx, OrgMembers.tsx
+    components/ ErrorBoundary.tsx, Layout.tsx, ProtectedRoute.tsx, Sidebar.tsx, Toast.tsx
+    pages/     Attachments.tsx, Categories.tsx, Dashboard.tsx, Login.tsx, Organizations.tsx, Reports.tsx, TransactionForm.tsx, Transactions.tsx
     lib/       queryClient.ts, formatters.ts
   backend/.dockerignore
   frontend/.dockerignore
